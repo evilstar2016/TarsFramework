@@ -12,7 +12,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O2 -Wall -Wno-deprecated")
 
 #set(CMAKE_BUILD_TYPE "Debug")
 
-set(TARS_VERSION "1.1.0")
+set(TARS_VERSION "1.2.0")
 add_definitions(-DTARS_VERSION="${TARS_VERSION}")
 
 set(INSTALL_PREFIX "/usr/local/tars/cpp")
@@ -32,6 +32,8 @@ link_libraries(${MYSQL_DIR_LIB}/libmysqlclient.a)
 link_libraries(pthread z dl rt)
 
 macro(complice_module MODULE)
+
+    set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/servers/${MODULE}/bin)
 
     include_directories(${PROJECT_SOURCE_DIR}/tarscpp/servant/protocol/framework)
     include_directories(${servant_SOURCE_DIR}/servant)
@@ -113,43 +115,19 @@ list(APPEND DEPENDS_LIST tarsconfig)
 #set(FRAMEWORK-TGZ "${CMAKE_BINARY_DIR}/framework-tmp.tgz")
 set(FRAMEWORK-TGZ "${CMAKE_BINARY_DIR}/framework.tgz")
 
-#需要压缩的文件
-set(MODULES "tars_install.sh")
-set(MODULES "${MODULES} tarsnode_install.sh")
-
-foreach (MODULE ${DEPENDS_LIST})
-    set(MODULES "${MODULES} ${MODULE}")
-endforeach ()
-
-#打包脚本
-SET(RUN_DEPLOY_COMMAND_FILE "${PROJECT_BINARY_DIR}/run-deploy-framework.cmake")
-FILE(WRITE ${RUN_DEPLOY_COMMAND_FILE} "#deploy framework-tar\n")
-FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} "EXECUTE_PROCESS(\n")
-FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} "WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/deploy/\n")
-FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} "COMMAND cp -rf ${PROJECT_SOURCE_DIR}/deploy/tars_install.sh .\n")
-FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} "COMMAND cp -rf ${PROJECT_SOURCE_DIR}/deploy/tarsnode_install.sh .\n")
-foreach (MODULE ${DEPENDS_LIST})
-    FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} "COMMAND cp -rf ${PROJECT_SOURCE_DIR}/deploy/${MODULE} .\n")
-endforeach ()
-FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} ")\n")
-FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} "EXECUTE_PROCESS(\n")
-FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} "WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/deploy/\n")
-FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} "COMMAND tar czfv ${FRAMEWORK-TGZ} ${MODULES}\n")
-#FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} "COMMAND mv ${FRAMEWORK-TGZ} ${CMAKE_BINARY_DIR}/framework.tgz\n")
-FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} ")\n")
-
 #执行命令
 add_custom_command(OUTPUT ${FRAMEWORK-TGZ}
-        COMMAND ${CMAKE_COMMAND} -P ${RUN_DEPLOY_COMMAND_FILE}
-        COMMENT "call ${RUN_DEPLOY_COMMAND_FILE}")
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/servers
+        COMMAND ${CMAKE_COMMAND} -E make_directory test 
+        COMMAND ${CMAKE_COMMAND} -E tar czf ${FRAMEWORK-TGZ} ${DEPENDS_LIST}
+        COMMAND ${CMAKE_COMMAND} -E copy ${FRAMEWORK-TGZ} ${PROJECT_BINARY_DIR}
+        COMMENT "make framework-tar")
 
 add_custom_target(framework-tar
         DEPENDS ${FRAMEWORK-TGZ} ${DEPENDS_LIST})
 
 ############################################################################################
-# 打包tarsnotify tarsstat tarsproperty tarslog tarsauth
-set(TARSQUERYSTAT tarsquerystat)
-set(TARSQUERYPROPERTY tarsqueryproperty)
+# 打包tarsnotify tarsstat tarsproperty tarslog tarsauth tarsquerystat tarsqueryproperty
 
 set(DEPENDS_LIST)
 list(APPEND DEPENDS_LIST tarsnotify)
@@ -158,32 +136,34 @@ list(APPEND DEPENDS_LIST tarsproperty)
 list(APPEND DEPENDS_LIST tarslog)
 list(APPEND DEPENDS_LIST tarsquerystat)
 list(APPEND DEPENDS_LIST tarsqueryproperty)
-list(APPEND DEPENDS_LIST tarsauth)
-
+#list(APPEND DEPENDS_LIST tarsauth)
 
 foreach (MODULE ${DEPENDS_LIST})
 
-    #set(MODULE-TGZ "${CMAKE_BINARY_DIR}/${MODULE}-tmp.tgz")
     set(MODULE-TGZ "${CMAKE_BINARY_DIR}/${MODULE}.tgz")
 
-    #打包脚本
-    SET(RUN_DEPLOY_COMMAND_FILE "${PROJECT_BINARY_DIR}/run-deploy-${MODULE}.cmake")
-    FILE(WRITE ${RUN_DEPLOY_COMMAND_FILE} "#deploy ${MODULE}-tar\n")
-    FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} "EXECUTE_PROCESS(\n")
-    FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} "WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/deploy/\n")
-    FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} "COMMAND tar czfv ${MODULE-TGZ} ${MODULE}\n")
-    #FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} "COMMAND mv ${MODULE-TGZ} ${CMAKE_BINARY_DIR}/${MODULE}.tgz\n")
-    FILE(APPEND ${RUN_DEPLOY_COMMAND_FILE} ")\n")
-
+    #兼容性更好
     add_custom_command(OUTPUT ${MODULE-TGZ}
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
-            COMMAND ${CMAKE_COMMAND} -P ${RUN_DEPLOY_COMMAND_FILE}
-            COMMENT "call ${RUN_DEPLOY_COMMAND_FILE}")
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${MODULE}
+            COMMAND ${CMAKE_COMMAND} -E copy servers/${MODULE}/bin/${MODULE} ${MODULE}/
+            COMMAND ${CMAKE_COMMAND} -E tar czf ${MODULE-TGZ} ${MODULE}
+            COMMAND ${CMAKE_COMMAND} -E remove_directory ${MODULE}
+            COMMENT "create ${MODULE-TGZ}")
 
     add_custom_target(${MODULE}-tar DEPENDS ${MODULE-TGZ} ${MODULE})
 endforeach ()
 
 ############################################################################################
+
+install(DIRECTORY build/servers/ DESTINATION deploy/framework/servers
+        PATTERN "tars*"
+        PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ)
+        
+install(DIRECTORY deploy DESTINATION ./ 
+        PATTERN "*.sh"
+        PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ)
+
 
 
 
