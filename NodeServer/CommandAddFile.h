@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -32,7 +32,7 @@ public:
     int execute(string &sResult);
 private:
     int getScriptFile(string &sResult);
-    bool                _byNode;
+//    bool                _byNode;
     string              _file; 
     string              _serverId;               
     ServerDescriptor    _desc;
@@ -43,8 +43,7 @@ private:
 //////////////////////////////////////////////////////////////
 //
 inline CommandAddFile::CommandAddFile(const ServerObjectPtr &pServerObjectPtr,const string &sFile,bool bByNode)
-:_byNode(bByNode)
-,_file(sFile)
+: _file(sFile)
 ,_serverObjectPtr(pServerObjectPtr)
 { 
     _desc      = _serverObjectPtr->getServerDescriptor();
@@ -55,20 +54,22 @@ inline CommandAddFile::CommandAddFile(const ServerObjectPtr &pServerObjectPtr,co
 // 
 inline ServerCommand::ExeStatus CommandAddFile::canExecute(string &sResult)
 {
-  
     TC_ThreadRecLock::Lock lock( *_serverObjectPtr );
-    
-    TLOGDEBUG("CommandAddFile::canExecute "<<_desc.application<< "." << _desc.serverName << " beging addFilesing------"<< endl);
+
+    NODE_LOG(_serverId)->debug() << "CommandAddFile::canExecute "<<_desc.application<< "." << _desc.serverName << " beging addFilesing------"<< endl;
+
     ServerObject::InternalServerState eState = _serverObjectPtr->getInternalState();
     
     if(_desc.application == "" || _desc.serverName == "" )
     {
-        TLOGERROR("CommandAddFile::canExecute app or server name is empty"<<endl);
+	 	sResult = FILE_FUN_STR+"app or server name is empty";
+	    NODE_LOG(_serverId)->error() << "CommandAddFile::canExecute app or server name is empty"<<endl;
         return DIS_EXECUTABLE;
     }
     if(_file.empty())
     {
-        TLOGERROR("CommandAddFile::canExecute file is empty. file:"<<_file<<endl);
+		sResult = FILE_FUN_STR+"file is empty. ";
+	    NODE_LOG(_serverId)->error() << "CommandAddFile::canExecute file is empty. file:"<<_file<<endl;
         return DIS_EXECUTABLE;
     }
     //设当前状态为正在AddFilesing
@@ -86,7 +87,7 @@ inline int CommandAddFile::execute(string &sResult)
         //若File不合法采用默认路径
         if( TC_File::isAbsolute(_file ) ==  false )
         {
-            _file = _serverObjectPtr->getExePath()+"/"+_file;
+            _file = _serverObjectPtr->getExePath()+FILE_SEP+_file;
         }
         _file               = TC_File::simplifyDirectory(TC_Common::trim(_file));
 
@@ -96,8 +97,8 @@ inline int CommandAddFile::execute(string &sResult)
         //创建目录
         if(!TC_File::makeDirRecursive(sFilePath ) )
         {
-
-            TLOGERROR("CommandAddFile::execute cannot create dir:"<<sFilePath<<" erro:"<<strerror(errno)<<endl);
+ 			sResult =  FILE_FUN_STR+"cannot create dir:" + sFilePath + " erro:"+ strerror(errno);
+	        NODE_LOG(_serverId)->error() << "CommandAddFile::execute cannot create dir:"<<sFilePath<<" erro:"<<strerror(errno)<<endl;
             return -1;
         }
         bool bRet = false;
@@ -107,17 +108,18 @@ inline int CommandAddFile::execute(string &sResult)
         }  
         else
         {
-            TarsRemoteConfig tTarsRemoteConfig;
-            tTarsRemoteConfig.setConfigInfo(Application::getCommunicator(), ServerConfig::Config,_desc.application, _desc.serverName, sFilePath,_desc.setId);
-//            tTarsRemoteConfig.setConfigInfo(ServerConfig::Config,_desc.application, _desc.serverName, sFilePath,_desc.setId);
-            bRet = tTarsRemoteConfig.addConfig(sFileName,sResult);
-            g_app.reportServer(_serverObjectPtr->getServerId(),sResult); 
+            TarsRemoteConfig remoteConfig;
+            remoteConfig.setConfigInfo(Application::getCommunicator(), ServerConfig::Config,_desc.application, _desc.serverName, sFilePath,_desc.setId);
+
+            bRet = remoteConfig.addConfig(sFileName,sResult);
+            g_app.reportServer(_serverId, "", _serverObjectPtr->getNodeInfo().nodeName, sResult); 
         }
         return bRet;               
   } 
   catch(exception &e)
   {
-      TLOGERROR("CommandAddFile::execute get file: "<<_file<<" from configServer fail."<<e.what());
+      sResult = FILE_FUN_STR+"get file:"+_file+" from configServer fail."+ e.what();
+	  NODE_LOG(_serverId)->error() << "CommandAddFile::execute get file: "<<_file<<" from configServer fail."<<e.what() << endl;
   }
   return -1;
 }
@@ -148,8 +150,9 @@ inline int CommandAddFile::getScriptFile(string &sResult)
         if (ret != 0)
         {
             sResult = FILE_FUN_STR+"[fail] get remote file :" + sFileName;
-            TLOGERROR(sResult<<endl);
-            g_app.reportServer(_serverId,sResult); 
+	        NODE_LOG(_serverId)->error() << sResult<<endl;
+            g_app.reportServer(_serverId, "", _serverObjectPtr->getNodeInfo().nodeName, sResult); 
+            // g_app.reportServer(_serverId,sResult); 
             return -1;
         }
         sStream = _serverObjectPtr->decodeMacro(sStream);
@@ -174,20 +177,22 @@ inline int CommandAddFile::getScriptFile(string &sResult)
         ofstream out(_file.c_str());
         if(!out.good())
         {
-            TLOGERROR("CommandAddFile::getScriptFile cannot create file: "<<(_file + " erro:"+ strerror(errno))<<endl);
+		    sResult =FILE_FUN_STR+ "cannot create file: " + _file + " erro:"+ strerror(errno);
+	        NODE_LOG(_serverId)->error() << "CommandAddFile::getScriptFile cannot create file: "<<(_file + " erro:"+ strerror(errno))<<endl;
             return -1;
         }
         out<<sStream;
         out.close();  
         sResult = FILE_FUN_STR+"[succ] get remote file :"+sFileName;
-        g_app.reportServer(_serverObjectPtr->getServerId(),sResult); 
-        TLOGDEBUG(sResult<<endl);
+        g_app.reportServer(_serverId, "", _serverObjectPtr->getNodeInfo().nodeName, sResult); 
+        // g_app.reportServer(_serverObjectPtr->getServerId(),sResult); 
+	    NODE_LOG(_serverId)->debug() << sResult<<endl;
         return 0;          
   } 
   catch(exception &e)
   {
-
-      TLOGERROR("CommandAddFile::getScriptFile get file"<<(_file+" from configServer fail."+ e.what())<<endl);
+      sResult = FILE_FUN_STR+"get file:"+_file+" from configServer fail."+ e.what();
+	  NODE_LOG(_serverId)->error() << "CommandAddFile::getScriptFile get file"<<(_file+" from configServer fail."+ e.what())<<endl;
   }  
   return -1; 
 }

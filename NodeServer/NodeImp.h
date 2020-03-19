@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -17,7 +17,7 @@
 #ifndef __NODE_IMP_H_
 #define __NODE_IMP_H_
 #include "Node.h"
-#include <unistd.h>
+//#include <unistd.h>
 #include "PlatformInfo.h"
 #include "Activator.h"
 #include "KeepAliveThread.h"
@@ -189,6 +189,27 @@ public:
     virtual tars::Int32 delCache(const std::string & sFullCacheName, const std::string &sBackupPath, const std::string & sKey, std::string &result,TarsCurrentPtr current);
 
     virtual tars::Int32 getUnusedShmKeys(tars::Int32 count,vector<tars::Int32> &shm_keys,tars::TarsCurrentPtr current);
+
+    /**
+    * 列举某个app下面某个服务的日志文件列表，以文件最后修改时间倒排序
+    */
+    int getLogFileList(const string& application, const string& serverName, vector<string>& logFileList,tars::TarsCurrentPtr current);
+
+    /**
+    * 获取某个日志文件的内容，cmd表示参数， 比如 tail -1000 | grep xxx
+    */
+    int getLogData(const string& application, const string& serverName,const string& logFile, const string& cmd, string& fileData, tars::TarsCurrentPtr current);
+
+    /**
+     * 获取节点的负载
+     * @param application
+     * @param serverName
+     * @param pid
+     * @param fileData
+     * @param current
+     * @return
+     */
+	int getNodeLoad(const string& application, const string& serverName, int pid, string& fileData, tars::TarsCurrentPtr current);
 
 private:
     string keyToStr(key_t key_value);

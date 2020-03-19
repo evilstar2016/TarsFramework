@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -16,9 +16,12 @@
 
 #include "ServerImp.h"
 #include "util.h"
+#include "NodeRollLogger.h"
 
 int ServerImp::keepAlive( const tars::ServerInfo& serverInfo, tars::TarsCurrentPtr current )
 {
+	string serverId = serverInfo.application + "." + serverInfo.serverName;
+
     try
     {   
         string sApp     = serverInfo.application;
@@ -27,32 +30,63 @@ int ServerImp::keepAlive( const tars::ServerInfo& serverInfo, tars::TarsCurrentP
         ServerObjectPtr pServerObjectPtr = ServerFactory::getInstance()->getServer( sApp, sName );
         if(pServerObjectPtr)
         {
-            TLOGDEBUG("ServerImp::keepAlive server " << serverInfo.application << "." << serverInfo.serverName << " keep alive"<< endl);
+            NODE_LOG(serverId)->debug() << "ServerImp::keepAlive server " << serverId << " keep alive, pid:" << serverInfo.pid << endl;
 
             pServerObjectPtr->keepAlive(serverInfo.pid,serverInfo.adapter);
 
             return 0;
         }
 
-        TLOGDEBUG("ServerImp::keepAlive server " << serverInfo.application << "." << serverInfo.serverName << " is not exist"<< endl);
+	    NODE_LOG(serverId)->debug() << "ServerImp::keepAlive server " << serverId << " is not exist, pid:" << serverInfo.pid << endl;
     }
     catch ( exception& e )
     {
-        TLOGERROR( "ServerImp::keepAlive catch exception :" << e.what() << endl);
+	    NODE_LOG(serverId)->error() << "ServerImp::keepAlive catch exception :" << e.what() << endl;
     }
     catch ( ... )
     {
-        TLOGERROR("ServerImp::keepAlive unkown exception catched" << endl);
+	    NODE_LOG(serverId)->error() << "ServerImp::keepAlive unkown exception catched" << endl;
     }
 
     return -1;
 }
 
+int ServerImp::keepActiving( const tars::ServerInfo& serverInfo, tars::TarsCurrentPtr current )
+{
+	string serverId = serverInfo.application + "." + serverInfo.serverName;
+
+	try
+    {
+        string sApp     = serverInfo.application;
+        string sName    = serverInfo.serverName;
+
+        ServerObjectPtr pServerObjectPtr = ServerFactory::getInstance()->getServer( sApp, sName );
+        if ( pServerObjectPtr )
+        {
+	        NODE_LOG(serverId)->debug()<< "server " << serverId << " keep activing"<< endl;
+            pServerObjectPtr->keepActiving(serverInfo.pid);
+            return 0;
+        }
+	    NODE_LOG(serverId)->error() << FILE_FUN<< "server " << serverId << " is not exist"<< endl;
+    }
+    catch ( exception& e )
+    {
+	    NODE_LOG(serverId)->error() << FILE_FUN << "catch exception :" << e.what() << endl;
+    }
+    catch ( ... )
+    {
+	    NODE_LOG(serverId)->error() << FILE_FUN << "unkown exception catched" << endl;
+    }
+    return -1;
+}
+
 int ServerImp::reportVersion( const string &app,const string &serverName,const string &version,tars::TarsCurrentPtr current)
 {
-    try
+	string serverId = app + "." + serverName;
+
+	try
     {
-        TLOGDEBUG("ServerImp::reportVersion|server|" << app << "." << serverName << "|version|" << version<< endl);
+        NODE_LOG(serverId)->debug() << "ServerImp::reportVersion|server|" << serverId << "|version|" << version<< endl;
 
         ServerObjectPtr pServerObjectPtr = ServerFactory::getInstance()->getServer( app, serverName );
         if(pServerObjectPtr)
@@ -62,15 +96,15 @@ int ServerImp::reportVersion( const string &app,const string &serverName,const s
             return 0;
         }
 
-        TLOGDEBUG("ServerImp::reportVersion server " << app << "." << serverName << " is not exist"<< endl);
+	    NODE_LOG(serverId)->debug() << "ServerImp::reportVersion server " << serverId << " is not exist"<< endl;
     }
     catch ( exception& e )
     {
-        TLOGERROR("ServerImp::reportVersion catch exception :" << e.what() << endl);
+	    NODE_LOG(serverId)->error() << "ServerImp::reportVersion catch exception :" << e.what() << endl;
     }
     catch ( ... )
     {
-        TLOGERROR("ServerImp::reportVersion unkown exception catched" << endl);
+	    NODE_LOG(serverId)->error() << "ServerImp::reportVersion unkown exception catched" << endl;
     }
 
     return -1;

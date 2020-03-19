@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -19,7 +19,7 @@
 
 #include "Node.h"
 #include "Registry.h"
-#include <unistd.h>
+// #include <unistd.h>
 #include "Activator.h"
 #include "util/tc_file.h"
 #include "util/tc_config.h"
@@ -127,7 +127,7 @@ public:
     ServerObject( const ServerDescriptor& tDesc);
 
     /**
-     * 析够
+     * 析构
      */
     ~ServerObject() { };
 
@@ -194,13 +194,13 @@ public:
     /**
     * 设置server对应pid
     */
-    void setPid( pid_t pid );
+    void setPid(int64_t pid );
 
     /**
     * 获取server对应pid
     */
 
-    int getPid() { return _pid; }
+	int64_t getPid() { return _pid; }
 
     /**
     * 获取server对应本地socket
@@ -220,7 +220,13 @@ public:
     * @para pid_t pid上报pid
     * @return void
     */
-    void keepAlive( pid_t pid, const string &adapter="");
+    void keepAlive(int64_t pid, const string &adapter="");
+
+    /**
+     * 启动中状态
+     * @param pid
+     */
+    void keepActiving(int64_t pid);
 
     /**
     * 取的server最近keepAlive时间
@@ -232,7 +238,7 @@ public:
     * 设置server最近keepAlive时间
     * @return void
     */
-    void setLastKeepAliveTime(int t,const string &adapter="");
+    void setLastKeepAliveTime(time_t t,const string &adapter="");
 
     /**
      * 服务是否已timeout
@@ -415,6 +421,8 @@ public:
     void setLibPath(const string &sLibPath){_libPath = sLibPath;}
     void setServerDir(const  string &sServerDir){_serverDir = sServerDir;}
     void setNodeInfo(const NodeInfo &tNodeInfo){_nodeInfo = tNodeInfo;}
+    const NodeInfo & getNodeInfo() { return _nodeInfo;}
+
     void setServerType( const string &sType ){ _serverType = TC_Common::lower(TC_Common::trim(sType));_serverType == "not_tars"?_tarsServer = false:_tarsServer=true;}
     void setMacro(const map<string,string>& mMacro);
     void setScript(const string &sStartScript,const string &sStopScript,const string &sMonitorScript);
@@ -496,7 +504,7 @@ private:
     PatchInfo           _patchInfo;            //下载信息
 
 private:
-    pid_t               _pid;                  //服务进程号
+    int64_t               _pid;                  //服务进程号
     string              _version;              //TARS版本
     NodeInfo            _nodeInfo;             //服务所在node信息
     TC_Endpoint         _localEndpoint;        //本地socket
@@ -510,7 +518,7 @@ private:
 
     int                 _timeout;              //心跳超时时间
     string              _env;                  //环境变量字符串
-    string                 _backupFiles;          //针对java服务发布时bin目录下需要保留的文件；可以用;|来分隔
+    string              _backupFiles;          //针对java服务发布时bin目录下需要保留的文件；可以用;|来分隔
 
 private:
     bool                 _limitStateUpdated;    //服务的limit配置是否有更新，重启也算更新

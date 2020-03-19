@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -59,7 +59,7 @@ protected:
     bool    _terminate;
 
     //数据库操作
-    DbProxy _db;
+    //DbProxy _db;
 
     //心跳更新时间间隔
     int     _updateInterval;

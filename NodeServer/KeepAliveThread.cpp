@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -44,16 +44,17 @@ KeepAliveThread::~KeepAliveThread()
 
 void KeepAliveThread::terminate()
 {
-    NODE_LOG("KeepAliveThread")->debug() << FILE_FUN << endl;
-
     _terminate = true;
 
     if (isAlive())
     {
-        _lock.notifyAll();
+	    TC_ThreadLock::Lock lock(_lock);
+
+	    _lock.notifyAll();
         getThreadControl().join();
     }
 
+    getThreadControl().join();
 }
 
 bool KeepAliveThread::timedWait(int millsecond)
@@ -73,12 +74,20 @@ void KeepAliveThread::run()
     bool bLoaded        = false;
     bool bRegistered    = false;
 
+    int64_t updateConfigTime = TNOW;
+
     while (!_terminate)
     {
         int64_t startMs = TC_TimeProvider::getInstance()->getNowMs();
 
         try
         {
+        	if(TNOW - updateConfigTime > 60 )
+	        {
+		        updateConfigTime = TNOW;
+        		NodeServer::onUpdateConfig(NodeServer::NODE_ID, NodeServer::CONFIG);
+	        }
+
             //获取主控代理
             if (!_registryPrx)
             {
@@ -125,12 +134,9 @@ void KeepAliveThread::run()
             NODE_LOG("KeepAliveThread")->error() << FILE_FUN << "catch unkown exception|" << endl;
         }
 
-        {
-            int64_t useMs = (TC_TimeProvider::getInstance()->getNowMs() - startMs);
-            NODE_LOG("KeepAliveThread")->debug() << FILE_FUN << "run use:" << useMs << " ms" << endl;
-        }
+        NODE_LOG("KeepAliveThread")->debug() << FILE_FUN << "run use:" << TNOWMS - startMs << " ms, wait:" << _monitorInterval << "ms" << endl;
 
-        timedWait(ServerFactory::getInstance()->getMinMonitorIntervalMs());
+        timedWait(_monitorInterval * 1000);
     }
 }
 
@@ -209,7 +215,7 @@ int KeepAliveThread::reportAlive()
         {
             tReport = tNow;
 
-            NODE_LOG("KeepAliveThread")->debug() << FILE_FUN << "node keep alive  ----------------------------------------------------|" << time(0) << "|" << pthread_self() << '\n' << endl;
+            NODE_LOG("KeepAliveThread")->debug() << FILE_FUN << "node keep alive time:" << TNOW << ", thread id:" << TC_Thread::CURRENT_THREADID() << '\n' << endl;
             
             int iRet = _registryPrx->keepAlive(_nodeInfo.nodeName, _platformInfo.getLoadInfo());
 
@@ -233,7 +239,7 @@ int KeepAliveThread::synStat()
         vector<ServerStateInfo> v;
         _stat.swap(v);
 
-        NODE_LOG("KeepAliveThread")->debug() << FILE_FUN << "node syn stat  size|" << v.size() << "|" << _synStatBatch << "|" << pthread_self() << endl;
+        NODE_LOG("KeepAliveThread")->debug() << FILE_FUN << "node syn stat  size|" << v.size() << "|" << _synStatBatch << "|" << TC_Thread::CURRENT_THREADID() << endl;
 
         if (v.size() > 0)
         {
@@ -276,7 +282,10 @@ void KeepAliveThread::checkAlive()
     _stat.clear();
 
     map<string, ServerGroup> mmServerList = ServerFactory::getInstance()->getAllServers();
-    map<string, ServerGroup>::const_iterator it = mmServerList.begin();
+
+	NODE_LOG("KeepAliveThread")->debug() << FILE_FUN << "server list size:" << mmServerList.size() << ", synInterval:" << _synInterval << endl;
+
+	map<string, ServerGroup>::const_iterator it = mmServerList.begin();
     for (; it != mmServerList.end(); it++)
     {
         map<string, ServerObjectPtr>::const_iterator  p = it->second.begin();
@@ -294,7 +303,7 @@ void KeepAliveThread::checkAlive()
 
                 pServerObjectPtr->doMonScript();
 
-                if (TNOW - _runTime < ServantHandle::HEART_BEAT_INTERVAL * 5)
+                if ((TNOW - _runTime) < (ServantHandle::HEART_BEAT_INTERVAL + 1))
                 {
                     //等待心跳包
                     continue;
@@ -345,8 +354,5 @@ void KeepAliveThread::checkAlive()
         synStat();
     }
 
-    {
-        int64_t useMs = (TC_TimeProvider::getInstance()->getNowMs() - startMs);
-        NODE_LOG("KeepAliveThread")->debug() << FILE_FUN << "checkAlive use:" << useMs << " ms" << endl;
-    }
+    NODE_LOG("KeepAliveThread")->debug() << FILE_FUN << "checkAlive use:" << TNOWMS - startMs << " ms" << endl;
 }

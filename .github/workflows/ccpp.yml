@@ -1,0 +1,22 @@
+name: C/C++ linux
+
+on: 
+  push:
+    branches:
+    - master
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    - name: install
+      run: sudo apt-get install -y bison flex cmake libncurses5-dev zlib1g-dev; cmake --version
+    - name: git
+      run: git submodule update --init --recursive
+    - name: configure
+      run: ls ..; ls tarscpp; cd build;cmake ..
+    - name: make
+      run: cd build; make

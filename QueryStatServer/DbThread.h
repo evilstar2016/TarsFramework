@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -44,7 +44,7 @@ public:
     DBThread();
 
     /**
-     * 析够
+     * 析构
      */
     ~DBThread();
 

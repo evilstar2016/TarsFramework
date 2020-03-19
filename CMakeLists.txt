@@ -4,38 +4,32 @@ project(framework)
 
 set(CMAKE_VERBOSE_MAKEFILE off)
 
-set(MYSQL_DIR_INC "/usr/local/mysql/include")
-set(MYSQL_DIR_LIB "/usr/local/mysql/lib")
+set(TARS_CPP_COMMON "1")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -g -O2 -Wall -Wno-deprecated")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O2 -Wall -Wno-deprecated")
+include("${PROJECT_SOURCE_DIR}/tarscpp/cmake/Common.cmake")
 
-#set(CMAKE_BUILD_TYPE "Debug")
+include("${PROJECT_SOURCE_DIR}/tarscpp/cmake/BuildTarsCpp.cmake")
 
-set(TARS_VERSION "1.2.0")
-add_definitions(-DTARS_VERSION="${TARS_VERSION}")
+include("${PROJECT_SOURCE_DIR}/tarscpp/cmake/Thirdparty.cmake")
 
-set(INSTALL_PREFIX "/usr/local/tars/cpp")
-
-set(CMAKE_INSTALL_PREFIX ${INSTALL_PREFIX})
+include("${PROJECT_SOURCE_DIR}/tarscpp/cmake/ParseAsm.cmake")
 
 add_subdirectory(tarscpp)
-set(TARS2CPP "${tools_BINARY_DIR}/tars2cpp/tars2cpp")
 
-include_directories(${util_SOURCE_DIR}/include)
 include_directories(${servant_SOURCE_DIR})
-include_directories(${MYSQL_DIR_INC})
-include_directories("thirdparty/rapidjson/include")
 
-link_libraries(tarsservant tarsutil)
-link_libraries(${MYSQL_DIR_LIB}/libmysqlclient.a)
-link_libraries(pthread z dl rt)
+#include_directories("thirdparty/rapidjson/include")
 
 macro(complice_module MODULE)
 
-    set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/servers/${MODULE}/bin)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/servers/${MODULE}/bin)
 
     include_directories(${PROJECT_SOURCE_DIR}/tarscpp/servant/protocol/framework)
+    include_directories(${PROJECT_SOURCE_DIR}/tarscpp/util/include)
+    if(WIN32)
+        include_directories(${PROJECT_SOURCE_DIR}/tarscpp/util/src/epoll_windows)
+    endif()
+
     include_directories(${servant_SOURCE_DIR}/servant)
 
     aux_source_directory(. DIR_SRCS)
@@ -44,6 +38,19 @@ macro(complice_module MODULE)
     add_dependencies(${MODULE} FRAMEWORK-PROTOCOL)
     add_dependencies(${MODULE} tars2cpp)
 
+    target_link_libraries(${MODULE} tarsservant tarsutil ${LIB_MYSQL})
+
+    if(TARS_SSL)
+        target_link_libraries(${MODULE} ${LIB_SSL} ${LIB_CRYPTO})
+    endif()
+
+    if(TARS_HTTP2)
+        target_link_libraries(${MODULE} ${LIB_HTTP2})
+    endif()
+
+    if(NOT WIN32)
+        link_libraries(pthread z dl)
+    endif()
 endmacro()
 
 #调用tars2cpp, 生成tars对应的文件
@@ -101,7 +108,7 @@ add_subdirectory(patchclient)
 add_subdirectory(StatServer)
 add_subdirectory(QueryStatServer)
 add_subdirectory(QueryPropertyServer)
-add_subdirectory(AuthServer)
+#add_subdirectory(AuthServer)
 ############################################################################################
 # 打包deploy, 用于部署
 
@@ -156,7 +163,7 @@ endforeach ()
 
 ############################################################################################
 
-install(DIRECTORY build/servers/ DESTINATION deploy/framework/servers
+install(DIRECTORY ${CMAKE_BINARY_DIR}/servers/ DESTINATION deploy/framework/servers
         PATTERN "tars*"
         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ)
         
@@ -164,8 +171,50 @@ install(DIRECTORY deploy DESTINATION ./
         PATTERN "*.sh"
         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ)
 
+############################################################################################
+#for debug
 
+add_custom_target(cp-tarsAdminRegistry
+        WORKING_DIRECTORY ${WORKING_DIRECTORY}
+        DEPENDS tarsAdminRegistry
+        COMMAND ${CMAKE_COMMAND} -E copy servers/tarsAdminRegistry/bin/tarsAdminRegistry /usr/local/app/tars/tarsAdminRegistry/bin/tarsAdminRegistry
+        COMMAND sh /usr/local/app/tars/tarsAdminRegistry/util/start.sh
+        COMMENT "cp tarsAdminRegistry & restart")
 
+add_custom_target(cp-tarsnotify
+        WORKING_DIRECTORY ${WORKING_DIRECTORY}
+        DEPENDS tarsnotify
+        COMMAND ${CMAKE_COMMAND} -E copy servers/tarsnotify/bin/tarsnotify /usr/local/app/tars/tarsnotify/bin/tarsnotify
+        COMMAND sh /usr/local/app/tars/tarsnotify/util/start.sh
+        COMMENT "cp tarsnotify & restart")
+
+add_custom_target(cp-tarsnode
+        WORKING_DIRECTORY ${WORKING_DIRECTORY}
+        DEPENDS tarsnode
+        COMMAND ${CMAKE_COMMAND} -E copy servers/tarsnode/bin/tarsnode /usr/local/app/tars/tarsnode/bin/tarsnode
+        COMMAND sh /usr/local/app/tars/tarsnode/util/start.sh
+        COMMENT "cp tarsnode & restart")
+
+add_custom_target(cp-tarsstat
+        WORKING_DIRECTORY ${WORKING_DIRECTORY}
+        DEPENDS tarsstat
+        COMMAND ${CMAKE_COMMAND} -E copy servers/tarsstat/bin/tarsstat /usr/local/app/tars/tarsstat/bin/tarsstat
+        COMMAND sh /usr/local/app/tars/tarsstat/util/start.sh
+        COMMENT "cp tarsstat & restart")
+
+add_custom_target(cp-tarsquerystat
+        WORKING_DIRECTORY ${WORKING_DIRECTORY}
+        DEPENDS tarsquerystat
+        COMMAND ${CMAKE_COMMAND} -E copy servers/tarsquerystat/bin/tarsquerystat /usr/local/app/tars/tarsquerystat/bin/tarsquerystat
+        COMMAND /usr/local/app/tars/tarsquerystat/util/start.sh
+        COMMENT "cp tarsquerystat & restart")
+
+add_custom_target(cp-tarsqueryproperty
+        WORKING_DIRECTORY ${WORKING_DIRECTORY}
+        DEPENDS tarsqueryproperty
+        COMMAND ${CMAKE_COMMAND} -E copy servers/tarsqueryproperty/bin/tarsqueryproperty /usr/local/app/tars/tarsqueryproperty/bin/tarsqueryproperty
+        COMMAND /usr/local/app/tars/tarsqueryproperty/util/start.sh
+        COMMENT "cp tarsqueryproperty & restart")
 
 
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -27,7 +27,7 @@
 
 using namespace tars;
 
-const string NODE_VERSION="B001";
+const string NODE_VERSION="20200305";
 
 class NodeServer;
 
@@ -36,7 +36,15 @@ extern NodeServer g_app;
 class NodeServer : public Application
 {
 public:
-     /**
+	static string NODE_ID;
+	static string CONFIG;
+
+	/**
+	 * update config
+	 */
+	static int onUpdateConfig(const string &nodeId, const string &sConfigFile);
+
+	/**
      * 获取Adapter Endpoint
      */
     TC_Endpoint getAdapterEndpoint(const string& name ) const;
@@ -55,7 +63,7 @@ public:
      /*
     *   上报string至notify
     */
-    void reportServer(const string &sServerId,const string &sResult);
+    void reportServer(const string& sServerId, const string &sSet, const string &sNodeName,  const string &sResult);
 
 public:
     /*
@@ -70,13 +78,16 @@ public:
 
 protected:
 
+    //host 换成ip
+    string host2Ip(const string& host);
+
     /**
      * 初始化, 只会进程调用一次
      */
     virtual void initialize();
 
     /**
-     * 析够, 只会进程调用一次
+     * 析构, 只会进程调用一次
      */
     virtual void destroyApp();
 
@@ -98,6 +109,7 @@ private:
 
     static string       g_sNodeIp;
 };
+
 #endif
 
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -26,9 +26,15 @@ using namespace tars;
 
 typedef StatPropMsgBody PropBody;
 typedef StatPropMsgHead PropHead;
+
 typedef TarsHashMap<PropHead,PropBody, ThreadLockPolicy, FileStorePolicy> PropHashMap;
 
+#if TARGET_PLATFORM_LINUX
+#include <ext/pool_allocator.h>
 typedef std::map<PropHead, PropBody, std::less<PropHead>, __gnu_cxx::__pool_alloc<std::pair<PropHead const, PropBody> > > PropertyMsg;
+#else
+typedef std::map<PropHead, PropBody, std::less<PropHead>> PropertyMsg;
+#endif
 
 class PropertyHashMap : public PropHashMap
 {
@@ -71,7 +77,7 @@ public:
 
                 PropBody stBody;
                 stBody.readFrom(is);
-                if(LOG->IsNeedLog(TarsRollLogger::INFO_LOG))
+                if(LOG->isNeedLog(TarsRollLogger::INFO_LOG))
                 {
                     ostringstream os;
                     head.displaySimple(os);
@@ -180,7 +186,7 @@ public:
                     ++it;
                 }
 
-                if(LOG->IsNeedLog(TarsRollLogger::INFO_LOG))
+                if(LOG->isNeedLog(TarsRollLogger::INFO_LOG))
                 {
                     ostringstream os;
                     head.displaySimple(os);

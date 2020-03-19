@@ -30,5 +30,3 @@ case $ARGS in
         echo "$0 cleanall: remove all temp file"
         ;;
 esac
-
-

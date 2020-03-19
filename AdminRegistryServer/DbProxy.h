@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -22,6 +22,7 @@
 #include "util/tc_monitor.h"
 #include "util/tc_mysql.h"
 #include "util/tc_file.h"
+#include "util/tc_singleton.h"
 #include "Node.h"
 #include "servant/TarsLogger.h"
 #include "AdminReg.h"
@@ -40,7 +41,7 @@ struct TarsNodeNotRegistryException : public TarsException
 /**
  *  数据库操作类
  */
-class DbProxy
+class DbProxy : public tars::TC_Singleton<DbProxy>
 {
 public:
     /**
@@ -61,6 +62,11 @@ public:
      * @return :  对象代理的智能指针
      */
     NodePrx getNodePrx(const string & nodeName);
+
+    /**
+     * 获取框架服务
+     */
+    int getFramework(vector<tars::FrameworkServer> &servers);
 
     /**
      * 增加异步任务
@@ -269,7 +275,8 @@ public:
 //    int getServerInfo(const tars::srvRequestInfo & info,vector<tars::serverInfo>& vServerInfo);
 protected:
     //mysql连接对象
-    tars::TC_Mysql _mysqlReg;
+    static vector<TC_Mysql*> _mysqlReg;
+	static vector<TC_ThreadMutex*> _mysqlLocks;
 
     //node节点代理列表
     static map<string , NodePrx> _mapNodePrxCache;
@@ -286,4 +293,5 @@ protected:
     static map<string,int> _groupNameIDCache;
 };
 
+#define DBPROXY		DbProxy::getInstance()
 #endif

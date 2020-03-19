@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -22,7 +22,7 @@
 ////////////////////////////////////////////////////////////////
 ReapSSDProcThread::ReapSSDProcThread(PropertyReapThread * proc)
 : _bTerminate(false)
-, _proc(proc)
+// , _proc(proc)
 {
 }
 

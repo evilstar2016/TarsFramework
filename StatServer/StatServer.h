@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -33,7 +33,7 @@ protected:
     virtual void initialize();
 
     /**
-     * 析够, 每个进程都会调用一次
+     * 析构, 每个进程都会调用一次
      */
     virtual void destroyApp();
 
@@ -48,7 +48,7 @@ public:
 
     string getRandOrder(void);
 
-    string getClonePath(void);
+//    string getClonePath(void);
 
     int getInserInterv(void);
 

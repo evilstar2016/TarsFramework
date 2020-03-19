@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -68,7 +68,7 @@ inline ServerCommand::ExeStatus CommandStart::canExecute(string& sResult)
 
     TC_ThreadRecLock::Lock lock(*_serverObjectPtr);
 
-    NODE_LOG("startServer")->debug() << FILE_FUN << _desc.application << "." << _desc.serverName << " beging activate------|byRegistry|" << _byNode << endl;
+    NODE_LOG(_serverObjectPtr->getServerId())->debug() << FILE_FUN << _desc.application << "." << _desc.serverName << " beging activate------|byRegistry|" << _byNode << endl;
 
     ServerObject::InternalServerState eState = _serverObjectPtr->getInternalState();
 
@@ -79,7 +79,7 @@ inline ServerCommand::ExeStatus CommandStart::canExecute(string& sResult)
     else if (!_serverObjectPtr->isEnabled())
     {
         sResult = "server is disabled";
-        NODE_LOG("startServer")->debug() << FILE_FUN << sResult << endl;
+        NODE_LOG(_serverObjectPtr->getServerId())->debug() << FILE_FUN << sResult << endl;
         return DIS_EXECUTABLE;
     }
 
@@ -87,14 +87,14 @@ inline ServerCommand::ExeStatus CommandStart::canExecute(string& sResult)
     {
         _serverObjectPtr->synState();
         sResult = "server is already " + _serverObjectPtr->toStringState(eState);
-        NODE_LOG("startServer")->debug() << FILE_FUN << sResult << endl;
+        NODE_LOG(_serverObjectPtr->getServerId())->debug() << FILE_FUN << sResult << endl;
         return NO_NEED_EXECUTE;
     }
 
     if (eState != ServerObject::Inactive)
     {
         sResult = "server state is not Inactive. the curent state is " + _serverObjectPtr->toStringState(eState);
-        NODE_LOG("startServer")->debug() << FILE_FUN << sResult << endl;
+        NODE_LOG(_serverObjectPtr->getServerId())->debug() << FILE_FUN << sResult << endl;
         return DIS_EXECUTABLE;
     }
 
@@ -105,7 +105,7 @@ inline ServerCommand::ExeStatus CommandStart::canExecute(string& sResult)
     {
         _serverObjectPtr->setPatched(false);
         sResult      = "The server exe patch " + _exeFile + " is not exist.";
-        NODE_LOG("startServer")->debug() << FILE_FUN << sResult << endl;
+        NODE_LOG(_serverObjectPtr->getServerId())->debug() << FILE_FUN << sResult << endl;
         return DIS_EXECUTABLE;
     }
 
@@ -118,19 +118,19 @@ inline ServerCommand::ExeStatus CommandStart::canExecute(string& sResult)
 
 inline bool CommandStart::startByScript(string& sResult)
 {
-    pid_t iPid = -1;
+    int64_t iPid = -1;
     bool bSucc = false;
     string sStartScript     = _serverObjectPtr->getStartScript();
     string sMonitorScript   = _serverObjectPtr->getMonitorScript();
 
     string sServerId    = _serverObjectPtr->getServerId();
-    iPid = _serverObjectPtr->getActivator()->activate(sServerId, sStartScript, sMonitorScript, sResult);
+    iPid = _serverObjectPtr->getActivator()->activate(sStartScript, sMonitorScript, sResult);
 
     vector<string> vtServerName =  TC_Common::sepstr<string>(sServerId, ".");
     if (vtServerName.size() != 2)
     {
         sResult = sResult + "|failed to get pid for  " + sServerId + ",server id error";
-        NODE_LOG("startServer")->error() << FILE_FUN << sResult  << endl;
+        NODE_LOG(_serverObjectPtr->getServerId())->error() << FILE_FUN << sResult  << endl;
         throw runtime_error(sResult);
     }
 
@@ -138,14 +138,14 @@ inline bool CommandStart::startByScript(string& sResult)
     string sFullExeFileName = TC_File::extractFilePath(sStartScript) + vtServerName[1];
     if (!TC_File::isFileExist(sFullExeFileName))
     {
-        NODE_LOG("startServer")->error() << FILE_FUN << "file name " << sFullExeFileName << " error, use exe file" << endl;
+        NODE_LOG(_serverObjectPtr->getServerId())->error() << FILE_FUN << "file name " << sFullExeFileName << " error, use exe file" << endl;
 
         //使用exe路径
         sFullExeFileName = _serverObjectPtr->getExeFile();
         if (!TC_File::isFileExist(sFullExeFileName))
         {
             sResult = sResult + "|failed to get full exe file name|" + sFullExeFileName;
-            NODE_LOG("startServer")->error() << FILE_FUN << sResult << endl;
+            NODE_LOG(_serverObjectPtr->getServerId())->error() << FILE_FUN << sResult << endl;
             throw runtime_error(sResult);
         }
     }
@@ -171,8 +171,8 @@ inline bool CommandStart::startByScript(string& sResult)
     {
     }
 
-    string sPidFile = "/usr/local/app/tars/tarsnode/util/" + sServerId + ".pid";
-    string sGetServerPidScript = "ps -ef | grep -v 'grep' |grep -iE ' " + sFullExeFileName + " '| awk '{print $2}' > " + sPidFile;
+    string sPidFile = ServerConfig::TarsPath + FILE_SEP + "tarsnode" + FILE_SEP + "util" + FILE_SEP + sServerId + ".pid";
+    string sGetServerPidScript = "ps -ef | grep -v 'grep' |grep -iE '" + sFullExeFileName + "'| awk '{print $2}' > " + sPidFile;
 
     while ((TNOW - iStartWaitInterval) < tNow)
     {
@@ -190,14 +190,15 @@ inline bool CommandStart::startByScript(string& sResult)
             }
         }
 
-        NODE_LOG("startServer")->debug() << FILE_FUN << _desc.application << "." << _desc.serverName << " activating usleep " << int(iStartWaitInterval) << endl;
-        usleep(START_SLEEP_INTERVAL);
+        NODE_LOG(_serverObjectPtr->getServerId())->debug() << FILE_FUN << _desc.application << "." << _desc.serverName << " activating usleep " << int(iStartWaitInterval) << endl;
+		std::this_thread::sleep_for(std::chrono::milliseconds(START_SLEEP_INTERVAL/1000));
+	//	usleep(START_SLEEP_INTERVAL);
     }
 
     if (_serverObjectPtr->checkPid() != 0)
     {
         sResult = sResult + "|get pid for server[" + sServerId + "],pid is not digit";
-        NODE_LOG("startServer")->error() << FILE_FUN << sResult << endl;
+        NODE_LOG(_serverObjectPtr->getServerId())->error() << FILE_FUN << sResult << endl;
         if (TC_File::isFileExist(sPidFile))
         {
             TC_File::removeFile(sPidFile, false);
@@ -209,6 +210,106 @@ inline bool CommandStart::startByScript(string& sResult)
     {
         TC_File::removeFile(sPidFile, false);
     }
+    return bSucc;
+}
+
+
+inline bool CommandStart::startNormal(string& sResult)
+{
+	int64_t iPid = -1;
+    bool bSucc  = false;
+    string sRollLogFile;
+    vector<string> vEnvs;
+    vector<string> vOptions;
+    string sConfigFile      = _serverObjectPtr->getConfigFile();
+    string sLogPath         = _serverObjectPtr->getLogPath();
+    string sServerDir       = _serverObjectPtr->getServerDir();
+    string sLibPath         = _serverObjectPtr->getLibPath();
+    string sExePath         = _serverObjectPtr->getExePath();
+
+    //环境变量设置
+    vector<string> vecEnvs = TC_Common::sepstr<string>(_serverObjectPtr->getEnv(), ";|");
+    for (vector<string>::size_type i = 0; i < vecEnvs.size(); i++)
+    {
+        vEnvs.push_back(vecEnvs[i]);
+    }
+
+    {
+        vEnvs.push_back("LD_LIBRARY_PATH=$LD_LIBRARY_PATH:" + sExePath + ":" + sLibPath);
+    }
+
+    //生成启动脚本
+    std::ostringstream osStartStcript;
+    osStartStcript << "#!/bin/sh" << std::endl;
+	osStartStcript << "source /etc/profile" << std::endl;
+    for (vector<string>::size_type i = 0; i < vEnvs.size(); i++)
+    {
+        osStartStcript << "export " << vEnvs[i] << std::endl;
+    }
+
+    osStartStcript << std::endl;
+    if (_serverObjectPtr->getServerType() == "tars_java")
+    {
+        //java服务
+        string sClassPath       = _serverObjectPtr->getClassPath();
+        string sJarList         = sExePath + FILE_SEP + "classes";
+        // vector<string> vJarList;
+        // TC_File::scanDir(sClassPath, vJarList);
+        // TC_File::listDirectory(sClassPath, vJarList, true);
+
+        sJarList = sJarList + ":" + sClassPath + FILE_SEP + "*";
+
+        vOptions.push_back("-Dconfig=" + sConfigFile);
+        string s = _serverObjectPtr->getJvmParams() + " -cp " + sJarList + " " + _serverObjectPtr->getMainClass();
+        vector<string> v = TC_Common::sepstr<string>(s, " \t");
+        vOptions.insert(vOptions.end(), v.begin(), v.end());
+
+		osStartStcript << _exeFile << " " << TC_Common::tostr(vOptions) << " &" << endl;
+    }
+    else if (_serverObjectPtr->getServerType() == "tars_nodejs") 
+    { 
+        vOptions.push_back(sExePath + FILE_SEP + string("tars_nodejs") + FILE_SEP + string("node-agent") + FILE_SEP + string("bin") + FILE_SEP + string("node-agent"));
+        string s = sExePath + FILE_SEP + "src" + FILE_SEP +" -c " + sConfigFile; 
+        vector<string> v = TC_Common::sepstr<string>(s," \t"); 
+        vOptions.insert(vOptions.end(), v.begin(), v.end());
+
+        //对于tars_nodejs类型需要修改下_exeFile
+        _exeFile = sExePath + FILE_SEP + string("tars_nodejs") + FILE_SEP + string("node");
+
+        osStartStcript<< _exeFile <<" "<<TC_Common::tostr(vOptions)<<" &"<< endl;
+    }
+    else if (_serverObjectPtr->getServerType() == "tars_php") 
+    { 
+        vOptions.push_back("--config=" + sConfigFile);
+        osStartStcript << _exeFile << " " << TC_Common::tostr(vOptions) << " &" << endl;
+    }
+    else
+    {
+        //c++服务
+        vOptions.push_back("--config=" + sConfigFile);
+        osStartStcript << _exeFile << " " << TC_Common::tostr(vOptions) << " &" << endl;
+    }
+
+    //保存启动方式到bin目录供手工启动
+    TC_File::save2file(sExePath + FILE_SEP + "tars_start.sh", osStartStcript.str());
+    TC_File::setExecutable(sExePath + FILE_SEP + "tars_start.sh", true);
+
+    if (sLogPath != "")
+    {
+        sRollLogFile = sLogPath + FILE_SEP + _desc.application + FILE_SEP + _desc.serverName + FILE_SEP + _desc.application + "." + _desc.serverName + ".log";
+    }
+
+    const string sPwdPath = sLogPath != "" ? sLogPath : sServerDir; //pwd patch 统一设置至log目录 以便core文件发现 删除
+    iPid = _serverObjectPtr->getActivator()->activate(_exeFile, sPwdPath, sRollLogFile, vOptions, vEnvs);
+    if (iPid == 0)  //child process
+    {
+        return false;
+    }
+
+    _serverObjectPtr->setPid(iPid);
+
+    bSucc = (_serverObjectPtr->checkPid() == 0) ? true : false;
+
     return bSucc;
 }
 
@@ -242,21 +343,21 @@ inline bool CommandStart::startByScriptPHP(string& sResult)
     TC_File::save2file(sExePath + "/tars_start.sh", osStartStcript.str());
     TC_File::setExecutable(sExePath + "/tars_start.sh", true);
 
-    pid_t iPid = -1;
+    int64_t iPid = -1;
     bool bSucc = false;
 
     string sStartScript     = _serverObjectPtr->getStartScript();
     sStartScript = sStartScript=="" ? _serverObjectPtr->getExePath() + "/tars_start.sh" : sStartScript;
     string sMonitorScript   = _serverObjectPtr->getMonitorScript();
     string sServerId    = _serverObjectPtr->getServerId();
-    iPid = _serverObjectPtr->getActivator()->activate(sServerId, sStartScript, sMonitorScript, sResult);
+    iPid = _serverObjectPtr->getActivator()->activate(sStartScript, sMonitorScript, sResult);
 
 
     vector<string> vtServerName =  TC_Common::sepstr<string>(sServerId, ".");
     if (vtServerName.size() != 2)
     {
         sResult = sResult + "|failed to get pid for  " + sServerId + ",server id error";
-        NODE_LOG("startServer")->error() << FILE_FUN << sResult  << endl;
+        NODE_LOG(_serverObjectPtr->getServerId())->error() << FILE_FUN << sResult  << endl;
         throw runtime_error(sResult);
     }
 
@@ -303,14 +404,14 @@ inline bool CommandStart::startByScriptPHP(string& sResult)
             }
         }
 
-        NODE_LOG("startServer")->debug() << FILE_FUN << _desc.application << "." << _desc.serverName << " activating usleep " << int(iStartWaitInterval) << endl;
-        usleep(START_SLEEP_INTERVAL);
+        NODE_LOG(_serverObjectPtr->getServerId())->debug() << FILE_FUN << _desc.application << "." << _desc.serverName << " activating usleep " << int(iStartWaitInterval) << endl;
+        TC_Common::msleep(START_SLEEP_INTERVAL/1000);
     }
 
     if (_serverObjectPtr->checkPid() != 0)
     {
         sResult = sResult + "|get pid for server[" + sServerId + "],pid is not digit";
-        NODE_LOG("startServer")->error() << FILE_FUN << sResult << endl;
+        NODE_LOG(_serverObjectPtr->getServerId())->error() << FILE_FUN << sResult << endl;
         if (TC_File::isFileExist(sPidFile))
         {
             TC_File::removeFile(sPidFile, false);
@@ -325,102 +426,6 @@ inline bool CommandStart::startByScriptPHP(string& sResult)
     return bSucc;
 }
 
-inline bool CommandStart::startNormal(string& sResult)
-{
-    pid_t iPid = -1;
-    bool bSucc  = false;
-    string sRollLogFile;
-    vector<string> vEnvs;
-    vector<string> vOptions;
-    string sConfigFile      = _serverObjectPtr->getConfigFile();
-    string sLogPath         = _serverObjectPtr->getLogPath();
-    string sServerDir       = _serverObjectPtr->getServerDir();
-    string sLibPath         = _serverObjectPtr->getLibPath();
-    string sExePath         = _serverObjectPtr->getExePath();
-
-    //环境变量设置
-    vector<string> vecEnvs = TC_Common::sepstr<string>(_serverObjectPtr->getEnv(), ";|");
-    for (vector<string>::size_type i = 0; i < vecEnvs.size(); i++)
-    {
-        vEnvs.push_back(vecEnvs[i]);
-    }
-
-    {
-        vEnvs.push_back("LD_LIBRARY_PATH=$LD_LIBRARY_PATH:" + sExePath + ":" + sLibPath);
-    }
-
-    //生成启动脚本
-    std::ostringstream osStartStcript;
-    osStartStcript << "#!/bin/sh" << std::endl;
-    for (vector<string>::size_type i = 0; i < vEnvs.size(); i++)
-    {
-        osStartStcript << "export " << vEnvs[i] << std::endl;
-    }
-
-    osStartStcript << std::endl;
-    if (_serverObjectPtr->getServerType() == "tars_java")
-    {
-        //java服务
-        string sClassPath       = _serverObjectPtr->getClassPath();
-        string sJarList         = sExePath + "/classes";
-        vector<string> vJarList;
-        TC_File::scanDir(sClassPath, vJarList);
-
-        sJarList = sJarList + ":" + sClassPath + "/*";
-
-        vOptions.push_back("-Dconfig=" + sConfigFile);
-        string s = _serverObjectPtr->getJvmParams() + " -cp " + sJarList + " " + _serverObjectPtr->getMainClass();
-        vector<string> v = TC_Common::sepstr<string>(s, " \t");
-        vOptions.insert(vOptions.end(), v.begin(), v.end());
-
-        osStartStcript << _exeFile << " " << TC_Common::tostr(vOptions) << endl;
-    }
-    else if (_serverObjectPtr->getServerType() == "tars_nodejs") 
-    { 
-        vOptions.push_back(sExePath + "/tars_nodejs/node-agent/bin/node-agent");
-        string s = sExePath + "/src/ -c " + sConfigFile; 
-        vector<string> v = TC_Common::sepstr<string>(s," \t"); 
-        vOptions.insert(vOptions.end(), v.begin(), v.end());
-
-        //对于tars_nodejs类型需要修改下_exeFile
-        _exeFile = sExePath+"/tars_nodejs/node";
-
-        osStartStcript<<sExePath+"/tars_nodejs/node" <<" "<<TC_Common::tostr(vOptions)<<" &"<< endl;
-    }
-    else if (_serverObjectPtr->getServerType() == "tars_php") 
-    { 
-        vOptions.push_back("--config=" + sConfigFile);
-        osStartStcript << _exeFile << " " << TC_Common::tostr(vOptions) << " &" << endl;
-    }
-    else
-    {
-        //c++服务
-        vOptions.push_back("--config=" + sConfigFile);
-        osStartStcript << _exeFile << " " << TC_Common::tostr(vOptions) << " &" << endl;
-    }
-
-    //保存启动方式到bin目录供手工启动
-    TC_File::save2file(sExePath + "/tars_start.sh", osStartStcript.str());
-    TC_File::setExecutable(sExePath + "/tars_start.sh", true);
-
-    if (sLogPath != "")
-    {
-        sRollLogFile = sLogPath + "/" + _desc.application + "/" + _desc.serverName + "/" + _desc.application + "." + _desc.serverName + ".log";
-    }
-
-    const string sPwdPath = sLogPath != "" ? sLogPath : sServerDir; //pwd patch 统一设置至log目录 以便core文件发现 删除
-    iPid = _serverObjectPtr->getActivator()->activate(_exeFile, sPwdPath, sRollLogFile, vOptions, vEnvs);
-    if (iPid == 0)  //child process
-    {
-        return false;
-    }
-
-    _serverObjectPtr->setPid(iPid);
-
-    bSucc = (_serverObjectPtr->checkPid() == 0) ? true : false;
-
-    return bSucc;
-}
 //////////////////////////////////////////////////////////////
 //
 inline int CommandStart::execute(string& sResult)
@@ -452,7 +457,7 @@ inline int CommandStart::execute(string& sResult)
             _serverObjectPtr->setLimitInfoUpdate(true);
             _serverObjectPtr->setStarted(true);
 			_serverObjectPtr->setStartTime(TNOWMS);
-            NODE_LOG("startServer")->debug() << FILE_FUN << _desc.application << "." << _desc.serverName << "_" << _desc.nodeName << " start succ " << sResult << ", use:" << (TC_TimeProvider::getInstance()->getNowMs() - startMs) << " ms" << endl;
+            NODE_LOG(_serverObjectPtr->getServerId())->debug() << FILE_FUN << _desc.application << "." << _desc.serverName << "_" << _desc.nodeName << " start succ " << sResult << ", use:" << (TC_TimeProvider::getInstance()->getNowMs() - startMs) << " ms" << endl;
             return 0;
         }
     }
@@ -469,7 +474,7 @@ inline int CommandStart::execute(string& sResult)
         sResult = "catch unkwon exception";
     }
 
-    NODE_LOG("startServer")->error() << FILE_FUN << _desc.application << "." << _desc.serverName << " start  failed :" << sResult << ", use:" << (TC_TimeProvider::getInstance()->getNowMs() - startMs) << " ms" << endl;
+    NODE_LOG(_serverObjectPtr->getServerId())->error() << FILE_FUN << _desc.application << "." << _desc.serverName << " start  failed :" << sResult << ", use:" << (TC_TimeProvider::getInstance()->getNowMs() - startMs) << " ms" << endl;
     
     _serverObjectPtr->setPid(0);
     _serverObjectPtr->setState(ServerObject::Inactive);

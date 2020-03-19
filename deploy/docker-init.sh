@@ -9,11 +9,21 @@ env
 
 NODE_VERSION="v12.13.0"
 MYSQLIP=`echo ${MYSQL_HOST}`
-USER=root
+USER=`echo ${MYSQL_USER}`
 PASS=`echo ${MYSQL_ROOT_PASSWORD}`
-PORT=3306
+PORT=`echo ${MYSQL_PORT}`
 REBUILD=`echo ${REBUILD}`
 INET=`echo ${INET}`
+#hostname存在, 则优先使用hostname
+DOMAIN=`echo ${DOMAIN}`
+
+if [ "$USER" == "" ]; then
+    USER="root"
+fi
+
+if [ "$PORT" == "" ]; then
+    PORT="3306"
+fi
 
 if [ "$INET" == "" ]; then
    INET=(eth0)
@@ -29,14 +39,36 @@ fi
 
 HOSTIP=""
 
-#######################################################
-TARS_PATH=/usr/local/app/tars
+if [ "$DOMAIN" != "" ]; then
+  HOSTIP=$DOMAIN
+else 
 
-source ~/.bashrc
+  #获取主机hostip
+  for IP in ${INET[@]};
+  do
+      HOSTIP=`ifconfig | grep ${IP} -A3 | grep inet | grep broad | awk '{print $2}'    `
+      echo $HOSTIP $IP
+      if [ "$HOSTIP" != "127.0.0.1" ] && [ "$HOSTIP" != "" ]; then
+        break
+      fi
+  done
+
+  if [ "$HOSTIP" == "127.0.0.1" ] || [ "$HOSTIP" == "" ]; then
+      echo "HOSTIP:[$HOSTIP], not valid. HOSTIP must not be 127.0.0.1 or empty."
+      exit 1
+  fi
+fi
+
+#######################################################
 
 WORKDIR=$(cd $(dirname $0); pwd)
 
+#######################################################
+TARS_PATH=/usr/local/app/tars
+
 mkdir -p ${TARS_PATH}
+
+source ~/.bashrc
 
 if [ "$SLAVE" != "true" ]; then
   if [ ! -d ${WORKDIR}/web ]; then
@@ -45,35 +77,28 @@ if [ "$SLAVE" != "true" ]; then
   fi
 fi
 
-#获取主机hostip
-for IP in ${INET[@]};
-do
-    HOSTIP=`ifconfig | grep ${IP} -A3 | grep inet | grep broad | awk '{print $2}'    `
-    echo $HOSTIP $IP
-    if [ "$HOSTIP" != "127.0.0.1" ] && [ "$HOSTIP" != "" ]; then
-      break
-    fi
-done
-
-if [ "$HOSTIP" == "127.0.0.1" ] || [ "$HOSTIP" == "" ]; then
-    echo "HOSTIP:[$HOSTIP], not valid. HOSTIP must not be 127.0.0.1 or empty."
-    exit 1
-fi
-
 cd ${WORKDIR}
 
-./tars-install.sh ${MYSQLIP} ${PORT} ${USER} ${PASS} ${HOSTIP} ${REBUILD} ${SLAVE}
+mkdir -p /data/tars/app_log
+mkdir -p /data/tars/web_log
+mkdir -p /data/tars/demo_log
+mkdir -p /data/tars/patchs
+mkdir -p /data/tars/tarsnode-data
+
+./tars-install.sh ${MYSQLIP} ${PASS} ${HOSTIP} ${REBUILD} ${SLAVE} ${USER}  ${PORT}
 if [ $? != 0 ]; then
     echo  "tars-install.sh error"
     exit 1
 fi
 
-echo "begin check server..."
+echo "install tars success. begin check server..."
 if [ "$SLAVE" != "true" ]; then
   TARS=(tarsAdminRegistry  tarsnode  tarsregistry)
 else
   TARS=(tarsnode tarsregistry)
 fi
+
+trap 'exit' SIGTERM SIGINT
 
 while [ 1 ]
 do
@@ -82,10 +107,6 @@ do
   do
     sh ${TARS_PATH}/${var}/util/check.sh
   done
-
-  if [ "$SLAVE" != "true" ]; then
-    pm2 ping tars-node-web; pm2 ping tars-user-system  
-  fi
 
   sleep 3
 

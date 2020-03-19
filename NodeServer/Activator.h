@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -17,7 +17,8 @@
 #ifndef __ACTIVATOR_H_
 #define __ACTIVATOR_H_
 #include "Node.h"
-#include <unistd.h>
+//#include <unistd.h>
+#include "util/tc_platform.h"
 #include "util/tc_file.h"
 #include "util/tc_monitor.h"
 #include <iostream>
@@ -26,6 +27,9 @@ using namespace tars;
 using namespace std;
 ////////////////////////////////////////////////////
 // 
+
+class ServerObject;
+typedef TC_AutoPtr<ServerObject> ServerObjectPtr;
 
 //用来标志脚本结束
 /////////////////////////////////////////////////////////
@@ -77,10 +81,12 @@ struct EnvVal : std::unary_function<string, string>
 
             start += str.size();
         }
-
-        //此处需要马上设置，否则以上宏替换中获取的环境变量为空
-        setenv((value.substr(0, pos)).c_str(), v.c_str(), true);
-
+#if TARGET_PLATFORM_WINDOWS
+		SetEnvironmentVariable((value.substr(0, pos)).c_str(), v.c_str());
+#else
+		//此处需要马上设置，否则以上宏替换中获取的环境变量为空
+		setenv((value.substr(0, pos)).c_str(),v.c_str(),true);
+#endif
         return value.substr(0, pos) + "=" + v;
     }
 };
@@ -96,12 +102,13 @@ public:
      * @param iPunishInterval 惩罚时间间隔 
      *
      */
-    Activator(int iTimeInterval,int iMaxCount,int iPunishInterval)
+    Activator(ServerObject *server, int iTimeInterval,int iMaxCount,int iPunishInterval)
     : _maxCount(iMaxCount)
     , _timeInterval(iTimeInterval)
     , _punishInterval(iPunishInterval)
-    , _termSignal(false)
+    // , _termSignal(false)
     , _redirectPath("")
+    , _server(server)
     {
         clearRunntimeData();
     };
@@ -121,7 +128,7 @@ public:
      * @return pid_t 生成子进程id 
      *
      */
-    pid_t activate(const string& strExePath, const string& strPwdPath, const string &strRollLogPath, const vector<string>& vOptions, vector<string>& vEnvs);
+    int64_t activate(const string& strExePath, const string& strPwdPath, const string &strRollLogPath, const vector<string>& vOptions, vector<string>& vEnvs);
 
     /**
      * 脚本启动服务
@@ -133,7 +140,8 @@ public:
      * @return pid_t 生成子进程id 
      *
      */
-    pid_t activate(const string &strServerId, const string& strStartScript, const string &strMonitorScript, string &strResult);
+    // pid_t activate(const string &strServerId, const string& strStartScript, const string &strMonitorScript, string &strResult);
+    int64_t activate(const string& strStartScript, const string &strMonitorScript, string &strResult);
 
     /**
      * 停止服务
@@ -141,7 +149,7 @@ public:
      * @param pid 进程id
      * @return int 0 成功  其它失败
      */
-    int deactivate( int pid );
+    int deactivate(int64_t pid );
 
     /**
      * 停止服务 并生成core文件
@@ -149,7 +157,7 @@ public:
      * @param pid 进程id
      * @return int 0 成功  其它失败
      */
-    int deactivateAndGenerateCore( int pid );
+    int deactivateAndGenerateCore( int64_t pid );
     
     /**
      * 发送信号
@@ -158,7 +166,7 @@ public:
      * @param signal 信号
      * @return int 0 成功  其它失败
      */
-    int sendSignal( int pid, int signal ) const;
+    int kill(int64_t pid ) const;
 public:
     
     bool isActivatingLimited (); //启动限制,用来防止问题服务不断重启影响其它服务
@@ -166,9 +174,9 @@ public:
     void addActivatingRecord();
 
     //运行脚本
-    bool doScript(const string &sServerId, const string &strScript, string &strResult, map<string,string> &mResult,const string &sEndMark = "");
+    bool doScript(const string &strScript, string &strResult, map<string,string> &mResult,const string &sEndMark = "");
 
-    map <string,string> parseScriptResult(const string &strServerId,const string &strResult);
+    map <string,string> parseScriptResult(const string &strResult);
 
     void setRedirectPath(const string& sRedirectpath) {_redirectPath = sRedirectpath;}
 
@@ -188,9 +196,11 @@ public:
     }
 
 private:
+#if TARGET_PLATFORM_LINUX || TARGET_PLATFORM_IOS
+
     int pclose2(FILE *fp);
     FILE* popen2(const char *cmdstring, const char *type);
-       
+#endif
 private:
     vector <time_t> _activingRecord;   //运行时
     bool    _limited;                  //是否启动受限，运行时
@@ -200,10 +210,11 @@ private:
     int     _punishInterval;           //惩罚受限时间间隔,单位分钟,配置
     
 private:
-    bool    _termSignal;               //非tars服务脚本运行超时停止信号
+    // bool    _termSignal;               //非tars服务脚本运行超时停止信号
     string  _redirectPath;               //标准输出和错误输出重定向目录
+    ServerObject *_server = NULL;       //
+
 };
 
 typedef TC_AutoPtr<Activator> ActivatorPtr;
 #endif
-

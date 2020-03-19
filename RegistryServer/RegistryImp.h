@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -112,7 +112,7 @@ public:
      *
      * @param name    node名称
      */
-    virtual int destroy(const string & name, tars::TarsCurrentPtr current);
+    virtual int destroyNode(const string & name, tars::TarsCurrentPtr current);
 
     /**
      * 上报server的tars库版本
