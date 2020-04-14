@@ -1,9 +1,12 @@
 #!/bin/bash
 
-OS=`uname`
+OSNAME=`uname`
+OS=1
 
-if [[ "$OS" =~ "Darwin" ]]; then
+if [[ "$OSNAME" == "Darwin" ]]; then
     OS=2
+elif [[ "$OSNAME" == "Windows_NT" ]]; then
+    OS=3
 else
     OS=1
 fi
@@ -12,6 +15,8 @@ function kill_all()
 {
   if [ $OS == 2 ]; then
     killall -9 $1
+  elif [ $OS == 3 ]; then
+    killall -q -9 $1
   else
     killall -9 -q $1
   fi
@@ -21,6 +26,8 @@ function netstat_port()
 {
   if [ $OS == 2 ]; then
     netstat -anL
+  elif [ $OS == 3 ]; then
+    netstat -an -p TCP
   else
     netstat -lpn
   fi
@@ -29,11 +36,6 @@ function netstat_port()
 #公共函数
 function LOG_ERROR()
 {
-	if (( $# < 1 ))
-	then
-		echo -e "\033[33m usesage: LOG_ERROR msg \033[0m";
-	fi
-	
 	local msg=$(date +%Y-%m-%d" "%H:%M:%S);
 
     msg="${msg} $@";
@@ -43,11 +45,6 @@ function LOG_ERROR()
 
 function LOG_WARNING()
 {
-	if (( $# < 1 ))
-	then
-		echo -e "\033[33m usesage: LOG_WARNING msg \033[0m";
-	fi
-	
 	local msg=$(date +%Y-%m-%d" "%H:%M:%S);
 
     msg="${msg} $@";
@@ -57,11 +54,6 @@ function LOG_WARNING()
 
 function LOG_DEBUG()
 {
-	if (( $# < 1 ))
-	then
-		LOG_WARNING "Usage: LOG_DEBUG logmsg";
-	fi
-	
 	local msg=$(date +%Y-%m-%d" "%H:%M:%S);
 
     msg="${msg} $@";
@@ -71,11 +63,6 @@ function LOG_DEBUG()
 
 function LOG_INFO()
 {
-	if (( $# < 1 ))
-	then
-		LOG_WARNING "Usage: LOG_INFO logmsg";
-	fi
-	
 	local msg=$(date +%Y-%m-%d" "%H:%M:%S);
 	
 	for p in $@
@@ -86,10 +73,8 @@ function LOG_INFO()
 	echo -e "\033[32m $msg \033[0m"  	
 }
 
-if (( $# < 7 ))
-then
-    echo "$0 MYSQL_IP MYSQL_PASSWORD  HOSTIP REBUILD(false[default]/true) SLAVE(false[default]/true) MYSQL_USER MYSQL_PORT";
-    echo "you should not call this script directly, you should call linux-install.sh or in docker by call docker-init.sh"
+if [ $# -lt 8 ]; then
+    echo "$0 MYSQL_IP MYSQL_PASSWORD  HOSTIP REBUILD(false[default]/true) SLAVE(false[default]/true) MYSQL_USER MYSQL_PORT INSTALL_PATH";
     exit 1
 fi
 
@@ -100,22 +85,46 @@ REBUILD=$4
 SLAVE=$5
 USER=$6
 PORT=$7
+INSTALL_PATH=$8
 
 if [ "${SLAVE}" != "true" ]; then
     SLAVE="false"
 fi
 
 if [ "${SLAVE}" != "true" ]; then
-    TARS=(tarsnotify tarsregistry tarsAdminRegistry tarsconfig tarsnode tarsproperty tarsqueryproperty tarsquerystat tarsstat tarslog tarspatch)
+    TARS="tarsAdminRegistry tarsregistry tarsconfig tarsnode tarsnotify tarsproperty tarsqueryproperty tarsquerystat tarsstat tarslog tarspatch"
 else
-    TARS=(tarsnotify tarsregistry tarsconfig tarsnode tarsproperty tarsqueryproperty tarsquerystat tarsstat)
+    TARS="tarsregistry tarsconfig tarsnode tarsnotify tarsproperty tarsqueryproperty tarsquerystat tarsstat"
 fi
 
-TARSALL=(tarsregistry tarsAdminRegistry tarsnode tarslog tarsconfig tarsnotify  tarspatch  tarsproperty tarsqueryproperty tarsquerystat  tarsstat)
-TARS_PATH=/usr/local/app/tars
+if [ $OS != 3 ]; then
+    if [ "${INSTALL_PATH}" == "" ]; then
+        INSTALL_PATH=/usr/local/app
+    fi
+else
+    if [ "${INSTALL_PATH}" == "" ]; then
+        INSTALL_PATH="c:/tars-install"
+    fi
+fi
+
+TARS_PATH=${INSTALL_PATH}/tars
+UPLOAD_PATH=$INSTALL_PATH
+WEB_PATH=$INSTALL_PATH
+
 mkdir -p ${TARS_PATH}
 
+TARSALL="tarsregistry tarsAdminRegistry tarsconfig tarsnode tarslog tarsnotify  tarspatch  tarsproperty tarsqueryproperty tarsquerystat  tarsstat"
+
 WORKDIR=$(cd $(dirname $0); pwd)
+
+if [ $OS == 3 ]; then
+    MYSQL_TOOL=${WORKDIR}/mysql-tool.exe
+else
+    MYSQL_TOOL=${WORKDIR}/mysql-tool
+fi
+
+TARS_USER=tarsAdmin
+TARS_PASS=Tars@2019
 
 LOG_INFO "====================================================================";
 LOG_INFO "===**********************tars-install*****************************===";
@@ -124,6 +133,7 @@ LOG_INFO "====================================================================";
 #输出配置信息
 LOG_DEBUG "===>print config info >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>";
 LOG_DEBUG "PARAMS:        "$*
+LOG_DEBUG "OS:            "$OSNAME"="$OS
 LOG_DEBUG "MYSQLIP:       "$MYSQLIP 
 LOG_DEBUG "USER:          "$USER
 LOG_DEBUG "PASS:          "$PASS
@@ -132,196 +142,257 @@ LOG_DEBUG "HOSTIP:        "$HOSTIP
 LOG_DEBUG "WORKDIR:       "$WORKDIR
 LOG_DEBUG "SLAVE:         "${SLAVE}
 LOG_DEBUG "REBUILD:       "${REBUILD}
+LOG_DEBUG "TARS_USER:     "${TARS_USER}
+LOG_DEBUG "TARS_PASS:     "${TARS_PASS}
+LOG_DEBUG "INSTALL_PATH:  "${INSTALL_PATH}
+LOG_DEBUG "TARS_PATH:     "${TARS_PATH}
+LOG_DEBUG "UPLOAD_PATH:   "${UPLOAD_PATH}/patchs
+LOG_DEBUG "WEB_PATH:      "${WEB_PATH}/web
 LOG_DEBUG "===<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< print config info finish.\n";
 
 ################################################################################
 #killall all tars-servers
-for var in ${TARSALL[@]};
+for var in $TARSALL;
 do
     kill_all ${var}
-#  killall -9 -q ${var}
 done
-for var in ${TARSALL[@]};
+for var in $TARSALL;
 do
     kill_all ${var}
-#  killall -9 -q ${var}
 done
 
 ################################################################################
 #check port
-PORTS=(18993 18793 18693 18193 18593 18493 18393 18293 12000 19385 17890 17891 3000 3001)
-for P in ${PORTS[@]};
-do
-    NETINFO=$(netstat_port)
+function check_ports()
+{
+    LOG_DEBUG "check port if conflict"
+    PORTS="18993 18793 18693 18193 18593 18493 18393 18293 12000 19385 17890 17891 3000 3001"
+    for P in $PORTS;
+    do
+        NETINFO=$(netstat_port)
 
-    RESULT=`echo ${NETINFO} | grep ${HOSTIP}:${P}`
-    if [ "$RESULT" != "" ]; then
-        LOG_ERROR ${HOSTIP}:${P}" confict!!"
-        exit 1
-    fi
+        RESULT=`echo ${NETINFO} | grep ${HOSTIP}:${P}`
+        if [ "$RESULT" != "" ]; then
+            LOG_ERROR ${HOSTIP}:${P}", port maybe conflict, please check!"
+        fi
 
-    RESULT=`echo ${NETINFO} | grep 127.0.0.1:${P}`
-    if [ "$RESULT" != "" ]; then
-        LOG_ERROR 127.0.0.1:${P}" confict!!"
-        exit 1
-    fi
-done
+        RESULT=`echo ${NETINFO} | grep 127.0.0.1:${P}`
+        if [ "$RESULT" != "" ]; then
+            LOG_ERROR 127.0.0.1:${P}", port maybe conflict, please check!"
+            # exit 1
+        fi
+    done
+}
 
+# check_ports
 
 ################################################################################
-#check mysql
-while [ 1 ]
-do
-    RESULT=`mysqladmin -h${MYSQLIP} -u${USER} -p${PASS} -P${PORT} ping`
 
-    echo $RESULT | grep -q "alive"
+function check_mysql()
+{
+    ${MYSQL_TOOL} --host=${MYSQLIP} --user="$1" --pass="$2" --port=${PORT} --check
+
     if [ $? == 0 ]; then
         LOG_INFO "mysql is alive"
-        break
+        return
     fi
 
-    LOG_ERROR "check mysql is not alive: mysqladmin -h${MYSQLIP} -u${USER} -p${PASS} -P${PORT} ping"
+    LOG_ERROR "check mysql is not alive: ${MYSQL_TOOL} --host=${MYSQLIP} --user="$1" --pass="$2" --port=${PORT} --check"
 
-    sleep 3
-done
+    exit 1
+}
+################################################################################
+#check mysql
+
+check_mysql ${USER} ${PASS}
+
+
+function exec_mysql_has()
+{
+    #echo "${MYSQL_TOOL} --host=${MYSQLIP} --user=${USER} --pass=${PASS} --port=${PORT} --charset=utf8 --has=$1"
+    ${MYSQL_TOOL} --host=${MYSQLIP} --user=${USER} --pass=${PASS} --port=${PORT} --charset=utf8 --has=$1
+
+    ret=$?
+    LOG_DEBUG "exec_mysql_has $1, ret: $ret"
+
+    return $ret
+}
 
 function exec_mysql_script()
 {
-    mysql -h${MYSQLIP} -u${USER} -p${PASS} -P${PORT} --default-character-set=utf8 -e "$1"
+    ${MYSQL_TOOL} --host=${MYSQLIP} --user=${USER} --pass=${PASS} --port=${PORT} --charset=utf8 --sql="$1"
 
     ret=$?
-    LOG_DEBUG "exec_mysql_script $1, ret: $ret"  
+    LOG_DEBUG "exec_mysql_script $1, ret code: $ret"  
 
     return $ret
 }
 
 function exec_mysql_sql()
 {
-    mysql -h${MYSQLIP} -u${USER} -p${PASS} -P${PORT} --default-character-set=utf8 -D$1 < $2
+    #echo "${MYSQL_TOOL} --host=${MYSQLIP} --user=${USER} --pass=${PASS} --port=${PORT} --charset=utf8 --db=$1 --file=$2"
+    ${MYSQL_TOOL} --host=${MYSQLIP} --user=${USER} --pass=${PASS} --port=${PORT} --charset=utf8 --tars-path=${TARS_PATH} --db=$1 --file=$2
 
     ret=$?
 
-    LOG_DEBUG "exec_mysql_sql $1 $2, ret: $ret"  
+    LOG_DEBUG "exec_mysql_sql $1 $2, ret code: $ret"  
+
+    return $ret
+}
+
+function exec_mysql_template()
+{
+    #echo "${MYSQL_TOOL} --host=${MYSQLIP} --user=${USER} --pass=${PASS} --port=${PORT} --charset=utf8 --parent=$1 --template=$2 --profile=$3"
+    ${MYSQL_TOOL} --host=${MYSQLIP} --user=${TARS_USER} --pass=${TARS_PASS} --port=${PORT} --charset=utf8 --db=db_tars --upload-path=${UPLOAD_PATH} --tars-path=${TARS_PATH} --parent=$1 --template=$2 --profile=$3
+
+    ret=$?
+
+    LOG_DEBUG "exec_mysql_template $1 $2, ret code: $ret"  
 
     return $ret
 }
 
 ################################################################################
-#check db_tars
-cp -rf ${WORKDIR}/framework/sql ${WORKDIR}/sql.tmp
 
-if [ $OS == 2 ]; then
-    #mac
-    sed -i "" "s/localip.tars.com/$HOSTIP/g" `grep localip.tars.com -rl ${WORKDIR}/sql.tmp/*`
-    sed -i "" "s/db.tars.com/${MYSQLIP}/g" `grep db.tars.com -rl ${WORKDIR}/sql.tmp/*`
-    sed -i "" "s/3306/${PORT}/g" `grep 3306 -rl ${WORKDIR}/sql.tmp/*`
-else
-    sed -i "s/localip.tars.com/$HOSTIP/g" `grep localip.tars.com -rl ${WORKDIR}/sql.tmp/*`
-    sed -i "s/db.tars.com/${MYSQLIP}/g" `grep db.tars.com -rl ${WORKDIR}/sql.tmp/*`
-    sed -i "s/3306/${PORT}/g" `grep 3306 -rl ${WORKDIR}/sql.tmp/*`
-fi
+function replace()
+{
+    SRC=$1
+    DST=$2
+    SCAN_FILE=$3
 
-if [ "$REBUILD" == "true" ]; then
-    exec_mysql_script "drop database if exists db_tars"
-    exec_mysql_script "drop database if exists tars_stat"
-    exec_mysql_script "drop database if exists tars_property"
-    exec_mysql_script "drop database if exists db_tars_web"    
-    exec_mysql_script "drop database if exists db_user_system"    
-    exec_mysql_script "drop database if exists db_cache_web"
-fi
+    FILES=`grep "${SRC}" -rl $SCAN_FILE`
 
-cd ${WORKDIR}/sql.tmp
-
-MYSQL_VER=`mysql -h${MYSQLIP} -u${USER} -p${PASS} -P${PORT} -e "SELECT VERSION();"`
-MYSQL_VER=`echo $MYSQL_VER | cut -d' ' -f2`
-MYSQL_GRANT="SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, PROCESS, REFERENCES, INDEX, ALTER, SHOW DATABASES, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE"
-
-echo "mysql version is: $MYSQL_VER"
-
-if [ `echo $MYSQL_VER|grep ^8.` ]; then
-    exec_mysql_script "CREATE USER 'tars'@'%' IDENTIFIED WITH mysql_native_password BY 'tars2015';"
-    exec_mysql_script "GRANT ${MYSQL_GRANT} ON *.* TO 'tars'@'%' WITH GRANT OPTION;"
-    exec_mysql_script "CREATE USER 'tars'@'localhost' IDENTIFIED WITH mysql_native_password BY 'tars2015';"
-    exec_mysql_script "GRANT ${MYSQL_GRANT} ON *.* TO 'tars'@'localhost' WITH GRANT OPTION;"
-    exec_mysql_script "CREATE USER 'tars'@'${HOSTIP}' IDENTIFIED WITH mysql_native_password BY 'tars2015';"
-    exec_mysql_script "GRANT ${MYSQL_GRANT} ON *.* TO 'tars'@'${HOSTIP}' WITH GRANT OPTION;"
-fi
-
-if [ `echo $MYSQL_VER|grep ^5.7` ]; then
-    exec_mysql_script "set global validate_password_policy=LOW;"
-fi
-
-if [ `echo $MYSQL_VER|grep ^5.` ]; then
-    exec_mysql_script "grant ${MYSQL_GRANT} on *.* to 'tars'@'%' identified by 'tars2015' with grant option;"
-    if [ $? != 0 ]; then
-        LOG_DEBUG "grant error, exit." 
-        exit 1
+    if [ "$FILES" == "" ]; then
+        return
     fi
 
-    exec_mysql_script "grant ${MYSQL_GRANT} on *.* to 'tars'@'localhost' identified by 'tars2015' with grant option;"
-    exec_mysql_script "grant ${MYSQL_GRANT} on *.* to 'tars'@'$HOSTIP' identified by 'tars2015' with grant option;"
-    exec_mysql_script "flush privileges;"
+    for file in $FILES;
+    do
+        ${MYSQL_TOOL} --src="${SRC}" --dst="${DST}" --replace=$file 
+    done
+}
+
+function replacePath()
+{
+    SRC=$1
+    DST=$2
+    SCAN_PATH=$3
+
+    FILES=`grep "${SRC}" -rl $SCAN_PATH/*`
+
+    if [ "$FILES" == "" ]; then
+        return
+    fi
+
+    for file in $FILES;
+    do
+        ${MYSQL_TOOL} --src="${SRC}" --dst="${DST}" --replace=$file 
+    done
+}
+
+################################################################################
+#replacePath sql/template
+SQL_TMP=${WORKDIR}/sql.tmp
+
+mkdir -p ${SQL_TMP}
+
+cp -rf ${WORKDIR}/web/sql/*.sql ${WORKDIR}/framework/sql/
+cp -rf ${WORKDIR}/web/demo/sql/*.sql ${WORKDIR}/framework/sql/
+
+cp -rf ${WORKDIR}/framework/sql/* ${SQL_TMP}
+
+replacePath localip.tars.com $HOSTIP ${SQL_TMP}
+
+cd ${SQL_TMP}
+
+MYSQL_VER=`${MYSQL_TOOL} --host=${MYSQLIP} --user=${USER} --pass=${PASS} --port=${PORT} --version`
+
+LOG_INFO "mysql version is: $MYSQL_VER"
+
+if [ "${SLAVE}" != "true" ]; then
+
+    if [ "$REBUILD" == "true" ]; then
+        exec_mysql_script "drop database if exists db_tars"
+        exec_mysql_script "drop database if exists tars_stat"
+        exec_mysql_script "drop database if exists tars_property"
+        exec_mysql_script "drop database if exists db_tars_web"    
+        exec_mysql_script "drop database if exists db_user_system"    
+        exec_mysql_script "drop database if exists db_cache_web"
+    fi
+
+    #MYSQL_GRANT="SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, PROCESS, REFERENCES, INDEX, ALTER, SHOW DATABASES, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE"
+    MYSQL_GRANT="SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, PROCESS, REFERENCES, INDEX, ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE USER"
+
+    if [ `echo $MYSQL_VER|grep ^8.` ]; then
+        exec_mysql_script "CREATE USER '${TARS_USER}'@'%' IDENTIFIED WITH mysql_native_password BY '${TARS_PASS}';"
+        exec_mysql_script "GRANT ${MYSQL_GRANT} ON *.* TO '${TARS_USER}'@'%' WITH GRANT OPTION;"
+        exec_mysql_script "CREATE USER '${TARS_USER}'@'localhost' IDENTIFIED WITH mysql_native_password BY '${TARS_PASS}';"
+        exec_mysql_script "GRANT ${MYSQL_GRANT} ON *.* TO '${TARS_USER}'@'localhost' WITH GRANT OPTION;"
+        exec_mysql_script "CREATE USER '${TARS_USER}'@'${HOSTIP}' IDENTIFIED WITH mysql_native_password BY '${TARS_PASS}';"
+        exec_mysql_script "GRANT ${MYSQL_GRANT} ON *.* TO '${TARS_USER}'@'${HOSTIP}' WITH GRANT OPTION;"
+    fi
+
+# if [ `echo $MYSQL_VER|grep ^5.7` ]; then
+#     exec_mysql_script "set global validate_password_policy=LOW;"
+# fi
+
+    if [ `echo $MYSQL_VER|grep ^5.` ]; then
+        exec_mysql_script "grant ${MYSQL_GRANT} on *.* to '${TARS_USER}'@'%' identified by '${TARS_PASS}' with grant option;"
+        if [ $? != 0 ]; then
+            LOG_DEBUG "grant error, exit." 
+            exit 1
+        fi
+
+        exec_mysql_script "grant ${MYSQL_GRANT} on *.* to '${TARS_USER}'@'localhost' identified by '${TARS_PASS}' with grant option;"
+        exec_mysql_script "grant ${MYSQL_GRANT} on *.* to '${TARS_USER}'@'$HOSTIP' identified by '${TARS_PASS}' with grant option;"
+        exec_mysql_script "flush privileges;"
+    fi
 fi
 
 ################################################################################
 #check mysql
-while [ 1 ]
-do
-    RESULT=`mysqladmin -h${MYSQLIP} -utars -ptars2015 -P${PORT} ping`
 
-    echo $RESULT | grep -q "alive"
-    if [ $? == 0 ]; then
-        LOG_INFO "mysql auth succ"
-        break
-    fi
-
-    LOG_ERROR "check mysql auth: mysqladmin -h${MYSQLIP} -utars -ptars2015 -P${PORT} ping"
-
-    sleep 3
-done
+    check_mysql ${TARS_USER} ${TARS_PASS}
 
 ################################################################################
-exec_mysql_script "use db_tars"
-if [ $? != 0 ]; then
 
-    LOG_INFO "no db_tars exists, begin build db_tars..."  
+if [ "${SLAVE}" != "true" ]; then
+    exec_mysql_has "db_tars"
+    if [ $? != 0 ]; then
 
-    LOG_INFO "modify ip in sqls:${WORKDIR}/framework/sql";
+        LOG_INFO "no db_tars exists, begin build db_tars..."  
 
-    LOG_INFO "create database (db_tars, tars_stat, tars_property, db_tars_web)";
+        LOG_INFO "modify ip in sqls:${WORKDIR}/framework/sql";
 
-    exec_mysql_script "create database db_tars"
-    exec_mysql_script "create database tars_stat"
-    exec_mysql_script "create database tars_property"
-    exec_mysql_script "create database db_tars_web"
+        LOG_INFO "create database (db_tars, tars_stat, tars_property, db_tars_web)";
 
-    exec_mysql_sql db_tars db_tars.sql
-    exec_mysql_sql db_tars_web db_tars_web.sql
-fi
+        exec_mysql_script "create database db_tars"
+        exec_mysql_script "create database tars_stat"
+        exec_mysql_script "create database tars_property"
+        exec_mysql_script "create database db_tars_web"
 
-exec_mysql_script "use db_cache_web"
-if [ $? != 0 ]; then
-    LOG_INFO "no db_cache_web exists, begin build db_cache_web..."
-    exec_mysql_script "create database db_cache_web"
+        exec_mysql_sql db_tars db_tars.sql
+        exec_mysql_sql db_tars_web db_tars_web.sql
+    fi
 
-    exec_mysql_sql db_cache_web db_cache_web.sql
+    exec_mysql_has "db_cache_web"
+    if [ $? != 0 ]; then
+        LOG_INFO "no db_cache_web exists, begin build db_cache_web..."
+        exec_mysql_script "create database db_cache_web"
+
+        exec_mysql_sql db_cache_web db_cache_web.sql
+    fi
 fi
 
 function update_template()
 {
     LOG_INFO "create t_profile_template";
 
-    sqlFile="tmp.sql"
-
-    echo > $sqlFile
-    echo "truncate t_profile_template;" >> $sqlFile
-
-    function read_dir(){
-        for template_name in $(ls template)
+    function read_dir()
+    {
+        for template_name in `ls template`
         do
-            echo $template_name #在此处处理文件即可
-
-            profile=$(cat template/${template_name} | sed "s/'/\\\'/g" | sed "s/3306/${PORT}/g" )
+            LOG_INFO "read_dir template:"$template_name
 
             parent_template="tars.default"
             if [ "$template_name" == "tars.springboot" ]; then
@@ -343,29 +414,27 @@ function update_template()
             elif [ "$template_name" == "tars.tarsregistry" ]; then
                 parent_template="tars.framework-db"
             fi
-            LOG_INFO "replace into \`t_profile_template\` (\`template_name\`, \`parents_name\` , \`profile\`, \`posttime\`, \`lastuser\`) VALUES ('${template_name}','${parent_template}','${profile}', now(),'admin');"
-            echo "replace into \`t_profile_template\` (\`template_name\`, \`parents_name\` , \`profile\`, \`posttime\`, \`lastuser\`) VALUES ('${template_name}','${parent_template}','${profile}', now(),'admin');" >> ${sqlFile}
+
+            exec_mysql_template $parent_template $template_name template/${template_name} 
 
         done
     }
 
     read_dir
-
-    exec_mysql_sql db_tars $sqlFile;
 }
 
-update_template
+if [ "${SLAVE}" != "true" ]; then
+    update_template
 
-exec_mysql_script "use db_user_system"
-if [ $? != 0 ]; then
-    LOG_INFO "db_user_system not exists, begin build db_user_system..."  
+    exec_mysql_has "db_user_system"
+    if [ $? != 0 ]; then
+        LOG_INFO "db_user_system not exists, begin build db_user_system..."  
 
-    exec_mysql_script "create database db_user_system"
+        exec_mysql_script "create database db_user_system"
 
-    exec_mysql_sql db_user_system db_user_system.sql
-fi
+        exec_mysql_sql db_user_system db_user_system.sql
+    fi
 
-if [ "$SLAVE" != "true" ]; then
     #current master server info
     LOG_INFO "create master servers";
 
@@ -382,125 +451,156 @@ exec_mysql_sql db_tars tars_node_init.sql
 
 cd ${WORKDIR}
 
-rm -rf ${WORKDIR}/sql.tmp
+LOG_INFO "prepare framework-------------------------------------"
 
-################################################################################
-#check framework
+FRAMEWORK_TMP=${WORKDIR}/framework.tmp
 
-LOG_INFO "copy ${WORKDIR}/framework/servers/* to tars path:${TARS_PATH}";
+mkdir -p ${FRAMEWORK_TMP}
 
-cp -rf ${WORKDIR}/framework/servers/*.sh ${TARS_PATH}
-chmod a+x ${TARS_PATH}/*.sh
-
-for var in ${TARS[@]};
+for var in $TARSALL;
 do
-    cp -rf ${WORKDIR}/framework/servers/${var} ${TARS_PATH}
+    cp -rf ${WORKDIR}/framework/servers/${var} ${FRAMEWORK_TMP}
+    cp -rf ${WORKDIR}/framework/conf/${var} ${FRAMEWORK_TMP}
+
+    if [ $OS != 3 ]; then
+        cp -rf ${WORKDIR}/framework/util-linux/${var} ${FRAMEWORK_TMP}
+    else
+        cp -rf ${WORKDIR}/framework/util-win/${var} ${FRAMEWORK_TMP}
+    fi
+
+    replacePath TARS_PATH ${TARS_PATH} ${FRAMEWORK_TMP}/${var}/conf
+    replacePath TARS_PATH ${TARS_PATH} ${FRAMEWORK_TMP}/${var}/util
 done
 
-function update_conf() {
+if [ $OS == 3 ]; then
+    cp -rf ${WORKDIR}/libmysql.dll ${FRAMEWORK_TMP}/tarsnode/data/lib/
+    cp -rf ${WORKDIR}/busybox.exe ${FRAMEWORK_TMP}/tarsnode/util/
 
-    LOG_INFO "update server config: [${TARS_PATH}/$1/conf/tars.$1.config.conf]";
+    cp -rf ${WORKDIR}/framework/util-win/*.bat ${FRAMEWORK_TMP}
 
-    if [ $OS == 2 ]; then
-        #mac
-        if [ "tarsnode" != "$1" ]; then
-            sed -i "" "s/localip.tars.com/$HOSTIP/g" `grep localip.tars.com -rl ${TARS_PATH}/$1/conf/tars.$1.config.conf`
-            sed -i "" "s/db.tars.com/$MYSQLIP/g" `grep db.tars.com -rl ${TARS_PATH}/$1/conf/tars.$1.config.conf`
-            sed -i "" "s/registry.tars.com/$HOSTIP/g" `grep registry.tars.com -rl ${TARS_PATH}/$1/conf/tars.$1.config.conf`
-            sed -i "" "s/3306/$PORT/g" `grep 3306 -rl ${TARS_PATH}/$1/conf/tars.$1.config.conf`
+    replace TARS_PATH ${TARS_PATH} "${FRAMEWORK_TMP}/*.bat"
+    replace WEB_PATH ${WEB_PATH} "${FRAMEWORK_TMP}/*.bat"
+else
+    cp -rf ${WORKDIR}/framework/util-linux/*.sh ${FRAMEWORK_TMP}
 
-        else
-            sed -i "" "s/localip.tars.com/$HOSTIP/g" `grep localip.tars.com -rl ${TARS_PATH}/$1/conf/tars.$1.config.conf`
-            sed -i "" "s/localip.tars.com/$HOSTIP/g" `grep localip.tars.com -rl ${TARS_PATH}/$1/util/execute.sh`
-            sed -i "" "s/registryAddress/tcp -h $HOSTIP -p 17890/g" `grep registryAddress -rl ${TARS_PATH}/$1/conf/tars.$1.config.conf`
-            sed -i "" "s/registryAddress/tcp -h $HOSTIP -p 17890/g" `grep registryAddress -rl ${TARS_PATH}/$1/util/execute.sh`
-        fi
+    replace TARS_PATH ${TARS_PATH} "${FRAMEWORK_TMP}/*.sh"
+    replace WEB_PATH ${WEB_PATH} "${FRAMEWORK_TMP}/*.sh"
+fi
 
-    else
-        if [ "tarsnode" != "$1" ]; then
-            sed -i "s/localip.tars.com/$HOSTIP/g" `grep localip.tars.com -rl ${TARS_PATH}/$1/conf/tars.$1.config.conf`
-            sed -i "s/db.tars.com/$MYSQLIP/g" `grep db.tars.com -rl ${TARS_PATH}/$1/conf/tars.$1.config.conf`
-            sed -i "s/registry.tars.com/$HOSTIP/g" `grep registry.tars.com -rl ${TARS_PATH}/$1/conf/tars.$1.config.conf`
-            sed -i "s/3306/$PORT/g" `grep 3306 -rl ${TARS_PATH}/$1/conf/tars.$1.config.conf`
+LOG_INFO "copy framework to install path"
 
-        else
-            sed -i "s/localip.tars.com/$HOSTIP/g" `grep localip.tars.com -rl ${TARS_PATH}/$1/conf/tars.$1.config.conf`
-            sed -i "s/localip.tars.com/$HOSTIP/g" `grep localip.tars.com -rl ${TARS_PATH}/$1/util/execute.sh`
-            sed -i "s/registryAddress/tcp -h $HOSTIP -p 17890/g" `grep registryAddress -rl ${TARS_PATH}/$1/conf/tars.$1.config.conf`
-            sed -i "s/registryAddress/tcp -h $HOSTIP -p 17890/g" `grep registryAddress -rl ${TARS_PATH}/$1/util/execute.sh`
+if [ $OS == 3 ]; then
+    if [ -f ${TARS_PATH}/tarsnode/util/stop.bat ]; then
+        ${TARS_PATH}/tarsnode/util/stop.bat 
+    fi
+fi
+
+sleep 1
+for var in $TARS;
+do
+
+    if [ $OS == 3 ]; then
+        #stop first , then copy in windows
+        if [ -d ${TARS_PATH}/${var} ]; then
+            ${TARS_PATH}/${var}/util/stop.bat 
+            sleep 1
         fi
     fi
+
+    # sleep 1
+    LOG_INFO "cp -rf ${FRAMEWORK_TMP}/${var} ${TARS_PATH}"
+    cp -rf ${FRAMEWORK_TMP}/${var} ${TARS_PATH}
+
+done
+
+sleep 3
+
+if [ $OS == 3 ]; then
+    cp -rf ${FRAMEWORK_TMP}/*.bat ${TARS_PATH}
+else
+    cp -rf ${FRAMEWORK_TMP}/*.sh ${TARS_PATH}
+fi
+
+################################################################################
+
+LOG_INFO "tar framework tgz"
+
+cd ${FRAMEWORK_TMP}
+
+mkdir -p ${WEB_PATH}/web/files/
+
+for var in $TARSALL;
+do
+    LOG_INFO "tar czf ${var}.tgz ${var}"
+    tar czf ${var}.tgz ${var}
+    cp -rf ${var}.tgz ${WEB_PATH}/web/files/
+    rm -rf ${var}.tgz
+done
+
+cd ${WORKDIR}
+
+LOG_INFO "copy tools to web files"
+
+if [ $OS == 3 ]; then
+    cp ${WORKDIR}/tools/install-win.sh ${WEB_PATH}/web/files/
+    cp ${WORKDIR}/busybox.exe ${WEB_PATH}/web/files/
+else
+    cp ${WORKDIR}/tools/install.sh ${WEB_PATH}/web/files/
+fi
+
+replace TARS_PATH ${TARS_PATH} ${WEB_PATH}/web/files/*.sh
+
+################################################################################
+
+function update_conf() 
+{
+    for file in `ls $1`;
+    do
+       ${MYSQL_TOOL} --host=${MYSQLIP} --user="${TARS_USER}" --pass="${TARS_PASS}" --port=${PORT} --config=$1/$file --tars-path=${TARS_PATH} --upload-path=${UPLOAD_PATH} --hostip=${HOSTIP}
+    done
 }
 
-#update server config
-for var in ${TARS[@]};
-do
-    update_conf ${var}
-done
+function update_util()
+{
+    for file in `ls $1`;
+    do
+        replace localip.tars.com $HOSTIP $1/${file}
+    done
+}
 
 #start server
-for var in ${TARS[@]};
+for var in $TARS;
 do
-   if [ ! -d ${TARS_PATH}/${var} ]; then
-       LOG_ERROR "${TARS_PATH}/${var} not exist."
-       exit 1 
-   fi
+    if [ ! -d ${TARS_PATH}/${var} ]; then
+        LOG_ERROR "${TARS_PATH}/${var} not exist."
+        exit 1 
+    fi
 
-    LOG_DEBUG ${TARS_PATH}/${var}/util/start.sh
-    sh ${TARS_PATH}/${var}/util/start.sh > /dev/null
+    LOG_DEBUG "update config: ${TARS_PATH}/${var}/conf"
+    update_conf "${TARS_PATH}/${var}/conf"
+
+    LOG_DEBUG "update util: ${TARS_PATH}/${var}/util"
+    update_util "${TARS_PATH}/${var}/util"
+
+    LOG_DEBUG "remove config: rm -rf ${TARS_PATH}/tarsnode/data/tars.${var}/conf/tars.${var}.config.conf"
+
+    rm -rf ${TARS_PATH}/tarsnode/data/tars.${var}/conf/tars.${var}.config.conf
+
+    if [ $OS == 3 ]; then
+        LOG_DEBUG ${TARS_PATH}/${var}/util/start.bat
+        ${TARS_PATH}/${var}/util/start.bat > /dev/null
+    else
+        LOG_DEBUG ${TARS_PATH}/${var}/util/start.sh
+        ${TARS_PATH}/${var}/util/start.sh > /dev/null
+    fi
+
 done
 
 ################################################################################
-#deploy & start web
-if [ "$SLAVE" != "true" ]; then
 
-    cd ${WORKDIR}
-    LOG_INFO "copy web to web path:/usr/local/app/";
+LOG_INFO "begin install web"
+${WORKDIR}/web-install.sh ${MYSQLIP} ${TARS_PASS} ${HOSTIP} ${REBUILD} ${SLAVE} ${TARS_USER}  ${PORT} ${TARS_PATH} ${WEB_PATH}
 
-    rm -rf web/log
-    cp -rf web /usr/local/app/
+rm -rf ${SQL_TMP}
+rm -rf ${FRAMEWORK_TMP}
 
-    LOG_INFO "update web config";
-
-    if [ $OS == 2 ]; then
-        sed -i "" "s/db.tars.com/$MYSQLIP/g" `grep db.tars.com -rl /usr/local/app/web/config/webConf.js`
-        sed -i "" "s/localip.tars.com/$HOSTIP/g" `grep localip.tars.com -rl /usr/local/app/web/config/webConf.js`
-        sed -i "" "s/3306/$PORT/g" `grep 3306 -rl /usr/local/app/web/config/webConf.js`
-        sed -i "" "s/registry.tars.com/$HOSTIP/g" `grep registry.tars.com -rl /usr/local/app/web/config/tars.conf`
-
-        sed -i "" "s/enableAuth: false/enableAuth: true/g" /usr/local/app/web/config/authConf.js
-        sed -i "" "s/enableLogin: false/enableLogin: true/g" /usr/local/app/web/config/loginConf.js
-
-        sed -i "" "s/db.tars.com/$MYSQLIP/g" `grep db.tars.com -rl /usr/local/app/web/demo/config/webConf.js`
-        sed -i "" "s/3306/$PORT/g" `grep 3306 -rl /usr/local/app/web/demo/config/webConf.js`
-
-        sed -i "" "s/enableLogin: false/enableLogin: true/g" /usr/local/app/web/demo/config/loginConf.js
-    else
-        sed -i "s/db.tars.com/$MYSQLIP/g" `grep db.tars.com -rl /usr/local/app/web/config/webConf.js`
-        sed -i "s/localip.tars.com/$HOSTIP/g" `grep localip.tars.com -rl /usr/local/app/web/config/webConf.js`
-        sed -i "s/3306/$PORT/g" `grep 3306 -rl /usr/local/app/web/config/webConf.js`
-        sed -i "s/registry.tars.com/$HOSTIP/g" `grep registry.tars.com -rl /usr/local/app/web/config/tars.conf`
-
-        sed -i "s/enableAuth: false/enableAuth: true/g" /usr/local/app/web/config/authConf.js
-        sed -i "s/enableLogin: false/enableLogin: true/g" /usr/local/app/web/config/loginConf.js
-
-        sed -i "s/db.tars.com/$MYSQLIP/g" `grep db.tars.com -rl /usr/local/app/web/demo/config/webConf.js`
-        sed -i "s/3306/$PORT/g" `grep 3306 -rl /usr/local/app/web/demo/config/webConf.js`
-
-        sed -i "s/enableLogin: false/enableLogin: true/g" /usr/local/app/web/demo/config/loginConf.js
-    fi
-
-    LOG_INFO "start web";
-
-    cd /usr/local/app/web; pm2 stop tars-node-web; pm2 delete tars-node-web; npm run prd; 
-    cd /usr/local/app/web/demo; pm2 stop tars-user-system;  pm2 delete tars-user-system; npm run prd
-
-    LOG_INFO "INSTALL TARS SUCC: http://$HOSTIP:3000/ to open the tars web."
-    LOG_INFO "If in Docker, please check you host ip and port."
-    LOG_INFO "You can start tars web manual: cd /usr/local/app/web; npm run prd"
-    LOG_INFO "You can install tarsnode to other machine in web(>=1.3.1)"
-    LOG_INFO "==============================================================";
-else
-    LOG_INFO "Install slave($SLAVE) node success"
-    LOG_INFO "==============================================================";
-fi

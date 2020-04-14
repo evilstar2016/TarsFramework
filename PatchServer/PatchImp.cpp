@@ -17,7 +17,7 @@
 #include "util/tc_file.h"
 #include "util/tc_config.h"
 #include "util/tc_md5.h"
-#include "servant/TarsLogger.h"
+#include "servant/RemoteLogger.h"
 #include "PatchImp.h"
 #include "PatchCache.h"
 #include "PatchServer.h"
@@ -60,8 +60,8 @@ void PatchImp::initialize()
 {
     try
     {
-        _directory       = (*g_conf)["/tars<directory>"];
-        _uploadDirectory = (*g_conf)["/tars<uploadDirectory>"];
+        _directory       = TC_File::simplifyDirectory((*g_conf)["/tars<directory>"]);
+        _uploadDirectory = TC_File::simplifyDirectory((*g_conf)["/tars<uploadDirectory>"]);
         _size            = TC_Common::toSize(g_conf->get("/tars<size>", "1M"), 1024*1024);
     }
     catch(exception &ex)
@@ -86,7 +86,7 @@ void PatchImp::initialize()
  **/
 int PatchImp::listFileInfo(const string &path, vector<FileInfo> & vf, TarsCurrentPtr current)
 {
-    TLOGDEBUG("PatchImp::listFileInfo ip:" << current->getIp() << "|path:" << path << endl);
+    TLOGDEBUG("PatchImp::listFileInfo ip:" << current->getHostName()  << "|path:" << path << endl);
 
     string dir = tars::TC_File::simplifyDirectory(_directory + FILE_SEP + path);
 
@@ -96,14 +96,14 @@ int PatchImp::listFileInfo(const string &path, vector<FileInfo> & vf, TarsCurren
     tars::TarsDisplayer ds(ss);
     ds.displaySimple(vf, false);
 
-    TLOGDEBUG("PatchImp::listFileInfo ip:" << current->getIp() << "|path:" << path << "|dir:" << dir << "|str:" << ss.str() << endl);
+    TLOGDEBUG("PatchImp::listFileInfo ip:" << current->getHostName()  << "|path:" << path << "|dir:" << dir << "|str:" << ss.str() << endl);
 
     return ret;
 }
 
 int PatchImp::download(const string & file, int pos, vector<char> & vb, TarsCurrentPtr current)
 {
-    TLOGDEBUG("PatchImp::download ip:" << current->getIp() << "|file:" << file << "|pos:" << pos << endl);
+    TLOGDEBUG("PatchImp::download ip:" << current->getHostName()  << "|file:" << file << "|pos:" << pos << endl);
 
     string path = tars::TC_File::simplifyDirectory(_directory + FILE_SEP + file);
     
@@ -128,7 +128,7 @@ int PatchImp::preparePatchFile(const string &app, const string &serverName, cons
     string dstDirectory = _directory + "/TARSBatchPatching/" + app + FILE_SEP + serverName;
     string dstfile = dstDirectory + FILE_SEP + app +"." + serverName + ".tgz";
 
-    TLOGDEBUG("PatchImp::preparePatchFile upfile:" << upfile << "|dstfile:" << dstfile << endl);
+    TLOGDEBUG("PatchImp::preparePatchFile upfile:" << upfile << ", dstfile:" << dstfile << endl);
 
     bool succ = TC_File::makeDirRecursive(dstDirectory);
     if (!succ)
@@ -286,7 +286,5 @@ int PatchImp::__downloadFromFile(const string & file, size_t pos, vector<char> &
     }
 
 }
-
-
 
 

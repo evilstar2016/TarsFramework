@@ -54,7 +54,6 @@ int64_t Activator::activate(const string& strExePath, const string& strPwdPath, 
 
 #if TARGET_PLATFORM_WINDOWS
 	vector<string> vArgs;
-//	vArgs.push_back(strExePath);
 	vArgs.insert(vArgs.end(), vOptions.begin(), vOptions.end());
 
 	NODE_LOG("startServer")->debug() << FILE_FUN << "activating server [exepath: " << strExePath << ", args: " << TC_Common::tostr(vArgs) << "]" << endl;
@@ -75,17 +74,15 @@ int64_t Activator::activate(const string& strExePath, const string& strPwdPath, 
 	PROCESS_INFORMATION pi;
 	memset(&pi, 0, sizeof(pi));
 	si.dwFlags = STARTF_USESHOWWINDOW;
-	si.wShowWindow = true; //TRUE表示显示创建的进程的窗口
-
+	si.wShowWindow = SW_HIDE; //TRUE表示显示创建的进程的窗口
+    
 	if (!CreateProcessA(
 		NULL,   //  指向一个NULL结尾的、用来指定可执行模块的宽字节字符串  
-		p, // 命令行字符串  
-		NULL, //    指向一个SECURITY_ATTRIBUTES结构体，这个结构体决定是否返回的句柄可以被子进程继承。  
-		NULL, //    如果lpProcessAttributes参数为空（NULL），那么句柄不能被继承。<同上>  
-		false,//    指示新进程是否从调用进程处继承了句柄。   
-		CREATE_NEW_CONSOLE,  //  指定附加的、用来控制优先类和进程的创建的标  
-			//  CREATE_NEW_CONSOLE  新控制台打开子进程  
-			//  CREATE_SUSPENDED    子进程创建后挂起，直到调用ResumeThread函数  
+		p,      // 命令行字符串  
+		NULL,   //    指向一个SECURITY_ATTRIBUTES结构体，这个结构体决定是否返回的句柄可以被子进程继承。  
+		NULL,   //    如果lpProcessAttributes参数为空（NULL），那么句柄不能被继承。<同上>  
+		false,  //    指示新进程是否从调用进程处继承了句柄。   
+		CREATE_NEW_CONSOLE|CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW,  //  指定附加的、用来控制优先类和进程的创建的标  
 		NULL, //    指向一个新进程的环境块。如果此参数为空，新进程使用调用进程的环境  
 		pwdCStr, //    指定子进程的工作路径  
 		&si, // 决定新进程的主窗体如何显示的STARTUPINFO结构体  
@@ -397,7 +394,6 @@ bool Activator::doScript(const string& strScript, string& strResult, map<string,
 	si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
 	//关键步骤，CreateProcess函数参数意义请查阅MSDN 
 	if (!CreateProcessA(strScript.c_str(), NULL, NULL, NULL, TRUE, NULL, NULL, NULL, &si, &pi)) {
-//        LOG->error() << FILE_FUN << "doScript CreateProcessA:" << strScript << endl;
         NODE_LOG(_server->getServerId())->error() << FILE_FUN << " doScript CreateProcessA:" << strScript << endl;
 
 		CloseHandle(hWrite);
@@ -467,7 +463,6 @@ bool Activator::doScript(const string& strScript, string& strResult, map<string,
         if (sRealEndMark == "" || strResult.find(sRealEndMark) != string::npos)
         {
 	        NODE_LOG(_server->getServerId())->info() << "Activator::doScript "<< sCmd << "|sEndMark " << sRealEndMark << " finded|" << strResult << endl;
-//	        TLOGINFO("Activator::doScript "<< sCmd << "|sEndMark " << sRealEndMark << " finded|" << strResult << endl);
 	        break;
         }
     }
@@ -497,7 +492,6 @@ map<string, string> Activator::parseScriptResult(const string& strResult)
             if (sName == "notify")
             {
                 g_app.reportServer(_server->getServerId(), "", _server->getNodeInfo().nodeName, sValue); 
-                // g_app.reportServer(strServerId, sValue);
             }
         }
     }

@@ -20,14 +20,23 @@
 #include "util/tc_common.h"
 #include "jmem/jmem_hashmap.h"
 #include "servant/PropertyF.h"
-#include "servant/TarsLogger.h"
+#include "servant/RemoteLogger.h"
 
 using namespace tars;
 
 typedef StatPropMsgBody PropBody;
 typedef StatPropMsgHead PropHead;
 
-typedef TarsHashMap<PropHead,PropBody, ThreadLockPolicy, FileStorePolicy> PropHashMap;
+//typedef TarsHashMap<PropHead,PropBody, ThreadLockPolicy, FileStorePolicy> PropHashMap;
+
+#if TARGET_PLATFORM_IOS
+typedef TarsHashMap<PropHead, PropBody, ThreadLockPolicy,MemStorePolicy> PropHashMap;//FileStorePolicy
+#elif TARGET_PLATFORM_WINDOWS
+typedef TarsHashMap<PropHead, PropBody, ThreadLockPolicy,FileStorePolicy> PropHashMap;//FileStorePolicy
+#else
+typedef TarsHashMap<PropHead, PropBody, ThreadLockPolicy,ShmStorePolicy> PropHashMap;//FileStorePolicy
+#endif
+
 
 #if TARGET_PLATFORM_LINUX
 #include <ext/pool_allocator.h>
@@ -77,7 +86,7 @@ public:
 
                 PropBody stBody;
                 stBody.readFrom(is);
-                if(LOG->isNeedLog(TarsRollLogger::INFO_LOG))
+                if(LOG->isNeedLog(LocalRollLogger::INFO_LOG))
                 {
                     ostringstream os;
                     head.displaySimple(os);
@@ -186,7 +195,7 @@ public:
                     ++it;
                 }
 
-                if(LOG->isNeedLog(TarsRollLogger::INFO_LOG))
+                if(LOG->isNeedLog(LocalRollLogger::INFO_LOG))
                 {
                     ostringstream os;
                     head.displaySimple(os);

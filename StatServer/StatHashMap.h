@@ -24,12 +24,16 @@
 #include "jmem/jmem_hashmap.h"
 #include "util/tc_file.h"
 #include "util/tc_config.h"
-#include "servant/TarsLogger.h"
+#include "servant/RemoteLogger.h"
 // #include <ext/pool_allocator.h>
 using namespace tars;
 
-#if TARGET_PLATFORM_IOS || TARGET_PLATFORM_WINDOWS
+//typedef TarsHashMap<StatMicMsgHead, StatMicMsgBody, ThreadLockPolicy,FileStorePolicy> HashMap;//FileStorePolicy
+
+#if TARGET_PLATFORM_IOS
 typedef TarsHashMap<StatMicMsgHead, StatMicMsgBody, ThreadLockPolicy,MemStorePolicy> HashMap;//FileStorePolicy
+#elif TARGET_PLATFORM_WINDOWS
+typedef TarsHashMap<StatMicMsgHead, StatMicMsgBody, ThreadLockPolicy,FileStorePolicy> HashMap;//FileStorePolicy
 #else
 typedef TarsHashMap<StatMicMsgHead, StatMicMsgBody, ThreadLockPolicy,ShmStorePolicy> HashMap;//FileStorePolicy
 #endif

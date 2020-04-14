@@ -44,7 +44,7 @@ PropertyDbManager::PropertyDbManager()
         "  `lasttime` varchar(16) NOT NULL default '', "
         "   PRIMARY KEY  (`appname`,`action`), "
         "   UNIQUE KEY `id` (`id`) "
-        " ) ENGINE=HEAP DEFAULT CHARSET=gbk";
+        " ) ENGINE=HEAP DEFAULT CHARSET=utf8";
     }
 
     string sCutType     = g_pconf->get("/tars/reapSql<CutType>","hour");
@@ -202,15 +202,15 @@ PropertyDbManager::PropertyDbManager()
         ++mDbToIpIter;
     }
 
-    map<string, vector<size_t> >::iterator m_iter1 = _ipHasDbInfo.begin();
-    while(m_iter1 != _ipHasDbInfo.end())
-    {
-        vector<size_t> &vDb = m_iter1->second;
+//     map<string, vector<size_t> >::iterator m_iter1 = _ipHasDbInfo.begin();
+//     while(m_iter1 != _ipHasDbInfo.end())
+//     {
+//         vector<size_t> &vDb = m_iter1->second;
 
-        FDLOG("PropertyPool") << "statsec ip:" << ServerConfig::LocalIp << "|ip:" << m_iter1->first << "|DbNum:" << vDb.size() << endl;
+// //        FDLOG("PropertyPool") << "statsec ip:" << ServerConfig::LocalIp << "|ip:" << m_iter1->first << "|DbNum:" << vDb.size() << endl;
 
-        ++m_iter1;
-    }
+//         ++m_iter1;
+//     }
 
     TLOGDEBUG("PropertyDbManager init ok." << endl);
 }
@@ -380,7 +380,7 @@ int PropertyDbManager::insert2Db(const PropertyMsg &mPropMsg, const string &sDat
 
                 TLOGDEBUG("insert " << strTbName << " affected:" << iCount  << endl);
 
-                FDLOG("PropertyPool") << "propertypool ip:" << ServerConfig::LocalIp << "|insert " << strTbName << "|insert affected:" << iCount << "|mysql affected:" << pMysql->getAffectedRows() << endl;
+//                FDLOG("PropertyPool") << "propertypool ip:" << ServerConfig::LocalIp << "|insert " << strTbName << "|insert affected:" << iCount << "|mysql affected:" << pMysql->getAffectedRows() << endl;
 
                 iCount = 0;
             }
@@ -390,7 +390,7 @@ int PropertyDbManager::insert2Db(const PropertyMsg &mPropMsg, const string &sDat
         {
             pMysql->execute(osSql.str());
             TLOGDEBUG("insert " << strTbName << " affected:" << iCount << endl);
-            FDLOG("PropertyPool") << "statsec ip:" << ServerConfig::LocalIp << "|insert " << strTbName << "|insert affected:" << iCount << "|mysql affected:" << pMysql->getAffectedRows() << endl;
+//            FDLOG("PropertyPool") << "statsec ip:" << ServerConfig::LocalIp << "|insert " << strTbName << "|insert affected:" << iCount << "|mysql affected:" << pMysql->getAffectedRows() << endl;
         }
     }
     catch (TC_Mysql_Exception& ex)
@@ -597,8 +597,8 @@ int PropertyDbManager::insert2MultiDbs(int iIndex, const PropertyMsg &propertyms
             int64_t iEnd = tars::TC_TimeProvider::getInstance()->getNowMs();
 
             TLOGDEBUG("insert|" << iIndex << "|" << getIpAndPort(iIndex) << "|" << sDate << "|" << sFlag << "|" << propertymsg.size() << "|" << (iEnd - iBegin) << endl);
-            FDLOG("PropertyPool") << "propertypool ip:" << ServerConfig::LocalIp  << "|insert|dbIndex:" << iIndex << "|" << getIpAndPort(iIndex) << "|date:" << sDate << "|tflag:" << sFlag 
-                << "|records:" << propertymsg.size() << "|timecost(ms):" << (iEnd - iBegin) << "|iBegin(ms):" << iBegin << "|iEnd(ms):" << iEnd << endl;
+//            FDLOG("PropertyPool") << "propertypool ip:" << ServerConfig::LocalIp  << "|insert|dbIndex:" << iIndex << "|" << getIpAndPort(iIndex) << "|date:" << sDate << "|tflag:" << sFlag
+//                << "|records:" << propertymsg.size() << "|timecost(ms):" << (iEnd - iBegin) << "|iBegin(ms):" << iBegin << "|iEnd(ms):" << iEnd << endl;
         }
     }
     catch(TC_Mysql_Exception& ex)

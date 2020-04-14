@@ -16,7 +16,7 @@
 
 #include "ExecuteTask.h"
 #include "servant/Communicator.h"
-#include "servant/TarsLogger.h"
+#include "servant/RemoteLogger.h"
 #include "util/tc_timeprovider.h"
 #include <thread>
 extern TC_Config * g_pconf;
@@ -96,6 +96,13 @@ void TaskList::setRspInfo(size_t index, bool start, EMTaskItemStatus status)
 //        log = ex.what();
         TLOGERROR("TaskList::setRspInfo error:" << ex.what() << endl);
     }
+}
+
+void TaskList::setRspPercent(size_t index, int percent)
+{
+    TC_LockT<TC_ThreadMutex> lock(*this);
+
+    _taskRsp.taskItemRsp[index].percent = percent; 
 }
 
 void TaskList::setRspLog(size_t index, const string &log)
@@ -213,15 +220,13 @@ string TaskList::get(const string &name, const map<string, string> &parameters)
     return it->second;
 }
 
-EMTaskItemStatus TaskList::patch(const TaskItemReq &req, string &log)
+EMTaskItemStatus TaskList::patch(size_t index, const TaskItemReq &req, string &log)
 {
-
     try
     {
-
         int ret = EM_TARS_UNKNOWN_ERR;
 
-        TLOGDEBUG("TaskList::patch:" << TC_Common::tostr(req.parameters.begin(), req.parameters.end()) << endl);
+        TLOGDEBUG("TaskList::patch:" << req.writeToJsonString() << ", " << TC_Common::tostr(req.parameters.begin(), req.parameters.end()) << endl);
         
         string patchId   = get("patch_id", req.parameters);
         string patchType = get("patch_type", req.parameters);
@@ -266,13 +271,17 @@ EMTaskItemStatus TaskList::patch(const TaskItemReq &req, string &log)
             catch (exception &ex)
             {
                 log = ex.what();
-                TLOGERROR("TaskList::patch getPatchPercent error, ret:" << ret << endl);
+                TLOGERROR("TaskList::patch getPatchPercent error, ret:" << ret << ", error:" << ex.what() << endl);
             }
+
+            //发布100%
+            setRspPercent(index, pi.iPercent);
 
             if (ret != 0)
             {
+                log = pi.sResult;
 				_adminPrx->updatePatchLog_inner(req.application, req.serverName, req.nodeName, patchId, req.userName, patchType, false);
-                TLOGERROR("TaskList::patch getPatchPercent error, ret:" << ret << endl);
+                TLOGERROR("TaskList::patch getPatchPercent error, ret:" << ret << ", " << pi.sResult << endl);
                 return EM_I_FAILED;
             }
 
@@ -362,7 +371,7 @@ EMTaskItemStatus TaskList::executeSingleTask(size_t index, const TaskItemReq &re
     }
     else if (req.command == "patch_tars")
     {
-        ret = patch(req, log);
+        ret = patch(index, req, log);
         if (ret == EM_I_SUCCESS && get("bak_flag", req.parameters) != "1")
         {
             //不是备机, 需要重启
@@ -597,6 +606,7 @@ bool ExecuteTask::getTaskRsp(const string &taskNo, TaskRsp &taskRsp)
 
     taskRsp = (it->second)->getTaskRsp();
 
+    TLOGDEBUG("ExecuteTask::getTaskRsp, taskNo=" << taskNo << ", rsp:" << taskRsp.writeToJsonString() << endl);
     ExecuteTask::getInstance()->checkTaskRspStatus(taskRsp);
 
     return true;

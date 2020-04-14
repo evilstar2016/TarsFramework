@@ -113,13 +113,13 @@ int StatImp::reportMicMsg( const map<tars::StatMicMsgHead, tars::StatMicMsgBody>
 
         if(bFromClient)
         {
-            head.masterIp   = current->getIp();  //以前是自己获取主调ip,现在从proxy直接
+            head.masterIp   = current->getHostName() ;  //以前是自己获取主调ip,现在从proxy直接
 
             head.slaveName  = getSlaveName(head.slaveName);
         }
         else
         {
-            head.slaveIp = current->getIp();//现在从proxy直接
+            head.slaveIp = current->getHostName() ;//现在从proxy直接
         }
 
         string sMasterName      = head.masterName;
@@ -139,7 +139,7 @@ int StatImp::reportMicMsg( const map<tars::StatMicMsgHead, tars::StatMicMsgBody>
 
         //如果不是info等级的日志级别，就别往里走了
         ostringstream os;
-        if(LOG->isNeedLog(TarsRollLogger::INFO_LOG))
+        if(LOG->isNeedLog(LocalRollLogger::INFO_LOG))
         {
             os.str("");
             head.displaySimple(os);
@@ -165,10 +165,11 @@ int StatImp::reportSampleMsg(const vector<StatSampleMsg> &msg,tars::TarsCurrentP
 {
     TLOGINFO("sample---------------------------------access size:" << msg.size() << endl);
 
+    string nodeName = current->getHostName();
     for(unsigned i=0; i<msg.size();i++)
     {
         StatSampleMsg sample = msg[i];
-        sample.masterIp = current->getIp();
+        sample.masterIp = nodeName;
 
         ostringstream os;
         sample.displaySimple(os);
@@ -212,7 +213,7 @@ int StatImp::addHashMap(const StatMicMsgHead &head, const StatMicMsgBody &body )
     if(rate >0.9)
     {
         TLOGERROR("StatImp::addHashMap hashmap will full|_iMemSize:" << pHashMap->getMapHead()._iMemSize << endl);
-        FDLOG("HashMap")<<"StatImp::addHashMap hashmap will full|_iMemSize:" << pHashMap->getMapHead()._iMemSize << endl;
+//        FDLOG("HashMap")<<"StatImp::addHashMap hashmap will full|_iMemSize:" << pHashMap->getMapHead()._iMemSize << endl;
         return -1;
     }
 
@@ -259,7 +260,7 @@ void StatImp::dump2file()
             g_app.setSelectBufferIndex(iSelectBuffer);
 
             TLOGDEBUG("StatImp::dump2file select buffer:" << iSelectBuffer << "|TimeInterv:" << tTimeInterv << "|now:" << tTimeNow << "|last:" << g_tLastDumpTime << endl);
-            FDLOG("CountStat") << "stat ip:" << ServerConfig::LocalIp << "|StatImp::dump2file select buffer:" << iSelectBuffer << "|TimeInterv:" << tTimeInterv << "|now:" << tTimeNow << "|last:" << g_tLastDumpTime << endl;
+//            FDLOG("CountStat") << "stat ip:" << ServerConfig::LocalIp << "|StatImp::dump2file select buffer:" << iSelectBuffer << "|TimeInterv:" << tTimeInterv << "|now:" << tTimeNow << "|last:" << g_tLastDumpTime << endl;
         }
     }
 }

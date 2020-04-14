@@ -1178,6 +1178,8 @@ int CDbHandle::loadObjectIdCache(const bool bRecoverProtect, const int iRecoverP
                 epf.host        = ep.getHost();
                 epf.port        = ep.getPort();
                 epf.timeout     = ep.getTimeout();
+                epf.weightType  = ep.getWeightType();
+                epf.weight      = ep.getWeight();
 
                 // 现在支持三种类型：0 UDP, 1 TCP, 2 SSL
                 // 所以istcp字段作为int类型使用
@@ -1212,6 +1214,10 @@ int CDbHandle::loadObjectIdCache(const bool bRecoverProtect, const int iRecoverP
                 {
                     epf.setId = res[i]["set_name"] + "." + res[i]["set_area"] + "." + res[i]["set_group"];
                 }
+
+                //获取权重信息
+                epf.weight = ep.getWeight();
+                epf.weightType = ep.getWeightType();
 
                 TLOGDEBUG("CDbHandle::loadObjectIdCache :" << res[i]["servant"] << "." << epf.host << "|" << epf.grouprealid << "|" << epf.groupworkid << "|" << res[i]["setting_state"] << "|" << res[i]["present_state"] << endl);
 
